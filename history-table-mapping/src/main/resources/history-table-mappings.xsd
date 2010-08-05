@@ -6,16 +6,17 @@
     elementFormDefault="qualified">
 
     <!-- definition of simple elements -->
-    <xs:element name="entity-class-name" type="xs:string"/>
+    <xs:element name="entity-class" type="xs:string"/>
     <xs:element name="entity-class-property" type="xs:string"/>
-    <xs:element name="entity-class-table" type="xs:string"/>
+    <xs:element name="entity-table" type="xs:string"/>
+    <xs:element name="entity-table-column" type="xs:string"/>
     <xs:element name="history-table" type="xs:string"/>
     <xs:element name="history-table-column" type="xs:string"/>
 
     <!-- definition of attributes -->
 
     <!-- definition of complex elements -->
-    <xs:element name="field">
+    <xs:element name="property-column-mapping">
         <xs:complexType>
             <xs:sequence>
                 <xs:element ref="entity-class-property">
@@ -23,6 +24,15 @@
                         <xs:documentation>
 
                             The property in the entity class to be mapped from.
+
+                        </xs:documentation>
+                    </xs:annotation>
+                </xs:element>
+                <xs:element ref="entity-table-column" minOccurs="0">
+                    <xs:annotation>
+                        <xs:documentation>
+
+                            The column in the entity table to map to.
 
                         </xs:documentation>
                     </xs:annotation>
@@ -40,19 +50,19 @@
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="mapping">
+    <xs:element name="entity-table-mapping">
         <xs:complexType>
             <xs:sequence>
-                <xs:element ref="entity-class-name">
+                <xs:element ref="entity-class">
                     <xs:annotation>
                         <xs:documentation>
 
-                            The entity class name.
+                            The fully qualified entity class.
 
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>
-                <xs:element ref="entity-class-table" minOccurs="0">
+                <xs:element ref="entity-table" minOccurs="0">
                     <xs:annotation>
                         <xs:documentation>
 
@@ -70,16 +80,20 @@
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>
-                <xs:element ref="field" maxOccurs="unbounded">
+                <xs:element ref="property-column-mapping" maxOccurs="unbounded">
                     <xs:annotation>
                         <xs:documentation>
 
-                            The relationship between a entity class property and
-                            a history table column.
+                            The relationship between a entity class property,
+                            a entity table column, and a history table column.
+
+                            If no "entity-table-column" is specified, the
+                            "entity-class-property" will be used to derive the
+                            history table column.
 
                             If no "history-table-column" is specified, the
-                            "entity-class-property" will be used as the history
-                            table column.
+                            "entity-class-property" will be used to derive the
+                            history table column.
 
                         </xs:documentation>
                     </xs:annotation>
@@ -91,20 +105,20 @@
     <xs:element name="mappings">
         <xs:complexType>
             <xs:sequence>
-                <xs:element ref="mapping" maxOccurs="unbounded">
+                <xs:element ref="entity-table-mapping" maxOccurs="unbounded">
                     <xs:annotation>
                         <xs:documentation>
 
-                            The relationship between a entity class and a
-                            history table.
+                            The relationship between a entity class, a entity 
+                            table, and a history table.
 
-                            If no "entity-class-table" is specified, the
-                            "entity-class-name" will be used as the entity class
+                            If no "entity-table" is specified, the 
+                            "entity-class" will be used to derive the entity
                             table.
 
                             If no "history-table" is specified, the 
-                            "entity-class-name" with "-history" appended will be
-                            used as the history table.
+                            "entity-class" will be used to derive the history
+                            table.
 
                         </xs:documentation>
                     </xs:annotation>

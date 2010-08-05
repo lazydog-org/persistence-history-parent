@@ -5,10 +5,22 @@
     xsi:schemaLocation="http://lazydog.org/xml/ns/historytable
                         http://lazydog.org/xml/ns/historytable/history-table-mappings.xsd">
 
-    <mapping>
-        <entity-class-name>Comic</entity-class-name>
-        <field>
+    <entity-table-mapping>
+        <entity-class>org.lazydog.comic.api.model.Comic</entity-class>
+        <property-column-mapping>
             <entity-class-property>id</entity-class-property>
-        </field>
-    </mapping>
+        </property-column-mapping>
+        <property-column-mapping>
+            <entity-class-property>title.id</entity-class-property>
+        </property-column-mapping>
+        <property-column-mapping>
+            <entity-class-property>startDate</entity-class-property>
+        </property-column-mapping>
+    </entity-table-mapping>
+    <entity-table-mapping>
+        <entity-class>org.lazydog.comic.api.model.ComicType</entity-class>
+        <property-column-mapping>
+            <entity-class-property>id</entity-class-property>
+        </property-column-mapping>
+    </entity-table-mapping>
 </mappings>

@@ -1,30 +1,32 @@
 package org.lazydog.history.table.internal.mapping;
 
+import java.util.List;
 import org.junit.Test;
+import org.lazydog.history.table.spi.mapping.EntityTableMapping;
 import org.lazydog.history.table.spi.mapping.HistoryTableMappingService;
-import org.lazydog.utilities.service.factory.ServiceFactory;
+//import org.lazydog.utilities.service.factory.ServiceFactory;
 
 
 /**
- *
- * @author R4R
+ * History table mapping service test.
+ * 
+ * @author  Ron Rickard
  */
 public class HistoryTableMappingServiceTest {
 
     @Test
-    public void testValidate() throws Exception {
+    public void testGetEntityTableMapping() throws Exception {
 
         // Declare.
-        HistoryTableMappingService service;
+        //HistoryTableMappingService service;
+        HistoryTableMappingServiceImpl service;
+        List<EntityTableMapping> entityTableMappings;
 
-        service = ServiceFactory.create(HistoryTableMappingService.class);
+        //service = ServiceFactory.create(HistoryTableMappingService.class);
+        service = new HistoryTableMappingServiceImpl();
 
-        // Declare.
-        HistoryTableMappingServiceImpl serviceImpl;
+        entityTableMappings = service.getEntityTableMappings();
 
-        serviceImpl = new HistoryTableMappingServiceImpl();
-
-        serviceImpl.validate();
-        serviceImpl.parse();
+        System.out.println(entityTableMappings);
     }
 }
