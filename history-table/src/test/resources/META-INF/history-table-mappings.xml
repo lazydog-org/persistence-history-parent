@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mappings
+    xmlns="http://lazydog.org/xml/ns/historytable"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://lazydog.org/xml/ns/historytable
+                        http://lazydog.org/xml/ns/historytable/history-table-mappings.xsd">
+
+    <table-data-source>jdbc/Test</table-data-source>
+    <history-table-data-source>jdbc/TestHistory</history-table-data-source>
+    <mapping>
+        <entity-class-name>org.lazydog.test.model.TestEntity1</entity-class-name>
+        <table-name>test-entity1</table-name>
+        <history-table-name>test-entity1-history</history-table-name>
+    </mapping>
+    <mapping>
+        <entity-class-name>org.lazydog.test.model.TestEntity2</entity-class-name>
+    </mapping>
+</mappings>
