@@ -5,18 +5,18 @@ import org.junit.Test;
 
 
 /**
- * History table mappings test.
+ * History table configuration test.
  *
  * @author  Ron Rickard
  */
-public class HistoryTableMappingsTest {
+public class HistoryTableConfigurationTest {
 
     @Test
     public void testValidate() throws Exception {
 
         // Declare.
-        HistoryTableMappings mappings;
+        HistoryTableConfiguration configuration;
 
-        mappings = HistoryTableMappings.newInstance(Level.FINEST);
+        configuration = HistoryTableConfiguration.newInstance(Level.FINEST);
     }
 }

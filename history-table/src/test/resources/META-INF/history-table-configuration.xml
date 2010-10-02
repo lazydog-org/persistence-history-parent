@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration
+    xmlns="http://lazydog.org/xml/ns/historytable"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://lazydog.org/xml/ns/historytable
+                        http://lazydog.org/xml/ns/historytable/history-table-configuration.xsd">
+
+    <table-data-source>jdbc/ComicCollectionPool</table-data-source>
+    <history-table-data-source>jdbc/ComicHistoryPool</history-table-data-source>
+    <mapping>
+        <entity-class-name>org.lazydog.comic.model.Comic</entity-class-name>
+    </mapping>
+    <mapping>
+        <entity-class-name>org.lazydog.comic.model.Title</entity-class-name>
+    </mapping>
+</configuration>

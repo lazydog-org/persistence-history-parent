@@ -24,24 +24,24 @@ import org.xml.sax.SAXException;
 
 
 /**
- * History table mappings.
+ * History table configuration.
  *
  * @author  Ron Rickard
  */
-public class HistoryTableMappings {
+public class HistoryTableConfiguration {
 
-    private static final Logger LOGGER = Logger.getLogger(HistoryTableMappings.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(HistoryTableConfiguration.class.getName());
     private static final Level DEFAULT_LOG_LEVEL = Level.WARNING;
-    private static final String CONFIGURATION_FILE = "META-INF/history-table-mappings.xml";
+    private static final String CONFIGURATION_FILE = "META-INF/history-table-configuration.xml";
     private static final String HISTORY_TABLE_SUFFIX = "_history";
-    private static final String SCHEMA_FILE = "history-table-mappings.xsd";
+    private static final String SCHEMA_FILE = "history-table-configuration.xsd";
 
     private enum ElementName {
+        CONFIGURATION,
         ENTITY_CLASS_NAME,
         HISTORY_TABLE_DATA_SOURCE,
         HISTORY_TABLE_NAME,
         MAPPING,
-        MAPPINGS,
         TABLE_DATA_SOURCE,
         TABLE_NAME;
     };
@@ -56,7 +56,7 @@ public class HistoryTableMappings {
      * 
      * @param  logLevel  the log level.
      */
-    private HistoryTableMappings(Level logLevel) {
+    private HistoryTableConfiguration(Level logLevel) {
         
         try {
 
@@ -210,8 +210,8 @@ public class HistoryTableMappings {
      *
      * @return  a new instance of this class.
      */
-    public static HistoryTableMappings newInstance(Level logLevel) {
-        return new HistoryTableMappings(logLevel);
+    public static HistoryTableConfiguration newInstance(Level logLevel) {
+        return new HistoryTableConfiguration(logLevel);
     }
 
     /**
@@ -219,8 +219,8 @@ public class HistoryTableMappings {
      *
      * @return  a new instance of this class.
      */
-    public static HistoryTableMappings newInstance() {
-       return new HistoryTableMappings(DEFAULT_LOG_LEVEL);
+    public static HistoryTableConfiguration newInstance() {
+       return new HistoryTableConfiguration(DEFAULT_LOG_LEVEL);
     }
 
     /**
@@ -421,11 +421,10 @@ public class HistoryTableMappings {
         Schema schema;
         Validator validator;
 
+        // Validate the configuration file.
         factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
         schema = factory.newSchema(this.getSchemaSource());
-
         validator = schema.newValidator();
-
         validator.validate(this.getConfigurationSource());
     }
 }
