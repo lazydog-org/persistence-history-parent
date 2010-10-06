@@ -11,6 +11,7 @@
     <xs:element name="table-name" type="xs:string"/>
     <xs:element name="history-table-data-source" type="xs:string"/>
     <xs:element name="history-table-name" type="xs:string"/>
+    <xs:element name="history-table-suffix" type="xs:string"/>
     
     <!-- definition of attributes -->
 
@@ -70,6 +71,17 @@
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>
+                <xs:element ref="history-table-suffix" minOccurs="0">
+                    <xs:annotation>
+                        <xs:documentation>
+
+                            The history table suffix.  If no
+                            "history-table-suffix" is specified, the default
+                            suffix is "_history".
+
+                        </xs:documentation>
+                    </xs:annotation>
+                </xs:element>
                 <xs:element ref="mapping" maxOccurs="unbounded">
                     <xs:annotation>
                         <xs:documentation>
@@ -82,8 +94,8 @@
                             table name.
 
                             If no "history-table-name" is specified, the
-                            "entity-class-name" with "_history" appended will
-                            be used as the history table name.
+                            "entity-class-name" with the history table suffix
+                            appended will be used as the history table name.
 
                         </xs:documentation>
                     </xs:annotation>

@@ -7,8 +7,10 @@
 
     <table-data-source>jdbc/ComicCollectionPool</table-data-source>
     <history-table-data-source>jdbc/ComicHistoryPool</history-table-data-source>
+    <history-table-suffix>_audit</history-table-suffix>
     <mapping>
         <entity-class-name>org.lazydog.comic.model.Comic</entity-class-name>
+        <history-table-name>comic_history</history-table-name>
     </mapping>
     <mapping>
         <entity-class-name>org.lazydog.comic.model.Title</entity-class-name>

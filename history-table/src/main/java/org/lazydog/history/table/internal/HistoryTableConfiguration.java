@@ -31,16 +31,17 @@ import org.xml.sax.SAXException;
 public class HistoryTableConfiguration {
 
     private static final Logger LOGGER = Logger.getLogger(HistoryTableConfiguration.class.getName());
+    private static final String DEFAULT_HISTORY_TABLE_SUFFIX = "_history";
     private static final Level DEFAULT_LOG_LEVEL = Level.WARNING;
     private static final String CONFIGURATION_FILE = "META-INF/history-table-configuration.xml";
-    private static final String HISTORY_TABLE_SUFFIX = "_history";
-    private static final String SCHEMA_FILE = "history-table-configuration.xsd";
+    private static final String SCHEMA_FILE = "META-INF/xsd/history-table-configuration.xsd";
 
     private enum ElementName {
         CONFIGURATION,
         ENTITY_CLASS_NAME,
         HISTORY_TABLE_DATA_SOURCE,
         HISTORY_TABLE_NAME,
+        HISTORY_TABLE_SUFFIX,
         MAPPING,
         TABLE_DATA_SOURCE,
         TABLE_NAME;
@@ -49,6 +50,7 @@ public class HistoryTableConfiguration {
     private Map<String,String> entityTableMap;
     private Map<String,String> entityHistoryTableMap;
     private String historyTableDataSource;
+    private String historyTableSuffix;
     private String tableDataSource;
 
     /**
@@ -75,7 +77,7 @@ public class HistoryTableConfiguration {
      * @return  the configuration source.
      */
     private Source getConfigurationSource() {
-        return new StreamSource(getClass().getClassLoader().getResourceAsStream(CONFIGURATION_FILE));
+        return new StreamSource(Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIGURATION_FILE));
     }
 
     /**
@@ -156,10 +158,10 @@ public class HistoryTableConfiguration {
      * 
      * @return  the history table name.
      */
-    private static String getHistoryTableName(String entityClassName) {
+    private String getHistoryTableName(String entityClassName) {
         return new StringBuffer()
                 .append(getTableName(entityClassName))
-                .append(HISTORY_TABLE_SUFFIX)
+                .append((historyTableSuffix != null) ? historyTableSuffix : DEFAULT_HISTORY_TABLE_SUFFIX)
                 .toString();
     }
     
@@ -169,7 +171,7 @@ public class HistoryTableConfiguration {
      * @return  the schema source.
      */
     private Source getSchemaSource() {
-        return new StreamSource(ClassLoader.getSystemResourceAsStream(SCHEMA_FILE));
+        return new StreamSource(Thread.currentThread().getContextClassLoader().getResourceAsStream(SCHEMA_FILE));
     }
 
     /**
@@ -285,6 +287,17 @@ public class HistoryTableConfiguration {
                             trace(Level.INFO, "historyTableName is %s", historyTableName);
                             break;
 
+                        case HISTORY_TABLE_SUFFIX:
+                            historyTableSuffix = getElementData(reader.nextEvent());
+                            trace(Level.INFO, "historyTableSuffix is %s", historyTableSuffix);
+                            break;
+
+                        case MAPPING:
+                            entityClassName = new String();
+                            historyTableName = new String();
+                            tableName = new String();
+                            break;
+
                         case TABLE_DATA_SOURCE:
                             tableDataSource = getElementData(reader.nextEvent());
                             trace(Level.INFO, "tableDataSource is %s", tableDataSource);
@@ -305,24 +318,23 @@ public class HistoryTableConfiguration {
                         case MAPPING:
 
                             // Add the entity table map.
+                            tableName = (tableName.isEmpty()) ?
+                                    getTableName(entityClassName) :
+                                    tableName;
                             entityTableMap.put(
                                     entityClassName,
-                                    (tableName == null) ?
-                                        getTableName(entityClassName) :
-                                        tableName);
-
+                                    tableName);
+                            
                             // Add the entity history table map.
+                            historyTableName = (historyTableName.isEmpty()) ?
+                                    getHistoryTableName(entityClassName) :
+                                    historyTableName;
                             entityHistoryTableMap.put(
                                     entityClassName,
-                                    (historyTableName == null) ?
-                                        getHistoryTableName(entityClassName) :
-                                        historyTableName);
+                                    historyTableName);
 
-                            // Clear the map variables.
-                            entityClassName = null;
-                            tableName = null;
-                            historyTableName = null;
-                            
+                            trace(Level.INFO, "entityTableMap[%s] is %s", entityClassName, entityTableMap.get(entityClassName));
+                            trace(Level.INFO, "entityHistoryTableMap[%s] is %s", entityClassName, entityHistoryTableMap.get(entityClassName));
                             break;
                     }
                 }
