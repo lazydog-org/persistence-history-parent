@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<persistence-history
+    xmlns="http://lazydog.org/xml/ns/persistence-history"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://lazydog.org/xml/ns/persistence-history
+                        http://lazydog.org/xml/ns/persistence-history/persistence-history.xsd">
+
+    <table-data-source>jdbc/ComicCollectionPool</table-data-source>
+    <history-table-data-source>jdbc/ComicHistoryPool</history-table-data-source>
+    <history-table-suffix>_audit</history-table-suffix>
+    <entity-mapping>
+        <class>org.lazydog.comic.model.Category</class>
+    </entity-mapping>
+    <entity-mapping>
+        <class>org.lazydog.comic.model.Comic</class>
+        <table>comic_test</table>
+        <history-table>comic_test_history</history-table>
+    </entity-mapping>
+    <entity-mapping>
+        <class>org.lazydog.comic.model.Title</class>
+        <table>title_test</table>
+        <history-table>title_test_history</history-table>
+        <attributes>
+            <attribute>
+                <name>id</name>
+                <column>title_id</column>
+            </attribute>
+            <attribute>
+                <name>name</name>
+            </attribute>
+        </attributes>
+    </entity-mapping>
+</persistence-history>

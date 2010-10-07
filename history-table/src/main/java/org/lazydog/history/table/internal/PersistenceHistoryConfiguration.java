@@ -28,27 +28,32 @@ import org.xml.sax.SAXException;
  *
  * @author  Ron Rickard
  */
-public class HistoryTableConfiguration {
+public class PersistenceHistoryConfiguration {
 
-    private static final Logger LOGGER = Logger.getLogger(HistoryTableConfiguration.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(PersistenceHistoryConfiguration.class.getName());
     private static final String DEFAULT_HISTORY_TABLE_SUFFIX = "_history";
     private static final Level DEFAULT_LOG_LEVEL = Level.WARNING;
-    private static final String CONFIGURATION_FILE = "META-INF/history-table-configuration.xml";
-    private static final String SCHEMA_FILE = "META-INF/xsd/history-table-configuration.xsd";
+    private static final String CONFIGURATION_FILE = "META-INF/persistence-history.xml";
+    private static final String SCHEMA_FILE = "META-INF/xsd/persistence-history.xsd";
 
     private enum ElementName {
-        CONFIGURATION,
-        ENTITY_CLASS_NAME,
+        ATTRIBUTE,
+        ATTRIBUTES,
+        CLASS,
+        COLUMN,
+        ENTITY_MAPPING,
+        HISTORY_TABLE,
         HISTORY_TABLE_DATA_SOURCE,
-        HISTORY_TABLE_NAME,
         HISTORY_TABLE_SUFFIX,
-        MAPPING,
+        NAME,
+        PERSISTENCE_HISTORY,
         TABLE_DATA_SOURCE,
-        TABLE_NAME;
+        TABLE;
     };
 
     private Map<String,String> entityTableMap;
     private Map<String,String> entityHistoryTableMap;
+    private Map<String,Map<String,String>> entityAttributesMap;
     private String historyTableDataSource;
     private String historyTableSuffix;
     private String tableDataSource;
@@ -58,7 +63,7 @@ public class HistoryTableConfiguration {
      * 
      * @param  logLevel  the log level.
      */
-    private HistoryTableConfiguration(Level logLevel) {
+    private PersistenceHistoryConfiguration(Level logLevel) {
         
         try {
 
@@ -122,6 +127,15 @@ public class HistoryTableConfiguration {
      */
     private static ElementName getElementName(String name) {
         return ElementName.valueOf(name.toUpperCase().replaceAll("-", "_"));
+    }
+
+    /**
+     * Get the entity attributes map.
+     * 
+     * @return  the entity attributes map.
+     */
+    public Map<String,Map<String,String>> getEntityAttributesMap() {
+        return this.entityAttributesMap;
     }
 
     /**
@@ -212,8 +226,8 @@ public class HistoryTableConfiguration {
      *
      * @return  a new instance of this class.
      */
-    public static HistoryTableConfiguration newInstance(Level logLevel) {
-        return new HistoryTableConfiguration(logLevel);
+    public static PersistenceHistoryConfiguration newInstance(Level logLevel) {
+        return new PersistenceHistoryConfiguration(logLevel);
     }
 
     /**
@@ -221,8 +235,8 @@ public class HistoryTableConfiguration {
      *
      * @return  a new instance of this class.
      */
-    public static HistoryTableConfiguration newInstance() {
-       return new HistoryTableConfiguration(DEFAULT_LOG_LEVEL);
+    public static PersistenceHistoryConfiguration newInstance() {
+       return new PersistenceHistoryConfiguration(DEFAULT_LOG_LEVEL);
     }
 
     /**
@@ -247,13 +261,19 @@ public class HistoryTableConfiguration {
         try {
 
             // Declare.
+            String entityAttributeName;
+            Map<String,String> entityAttributes;
             String entityClassName;
             String historyTableName;
+            String tableColumnName;
             String tableName;
 
             // Initialize.
+            entityAttributeName = null;
+            entityAttributes = null;
             entityClassName = null;
             historyTableName = null;
+            tableColumnName = null;
             tableName = null;
 
             // Loop through the XML events.
@@ -268,13 +288,39 @@ public class HistoryTableConfiguration {
                 // Check if the event is a start element.
                 if (event.isStartElement()) {
 
-                    trace(Level.INFO, "process element %s", getElementName(event.asStartElement()));
+                    trace(Level.INFO, "process start element %s", getElementName(event.asStartElement()));
 
                     switch(getElementName(event.asStartElement())) {
 
-                        case ENTITY_CLASS_NAME:
+                        case ATTRIBUTE:
+                            entityAttributeName = new String();
+                            tableColumnName = new String();
+                            break;
+
+                        case ATTRIBUTES:
+                            entityAttributes = new HashMap<String,String>();
+                            break;
+                            
+                        case CLASS:
                             entityClassName = getElementData(reader.nextEvent());
                             trace(Level.INFO, "entityClassName is %s", entityClassName);
+                            break;
+
+                        case COLUMN:
+                            tableColumnName = getElementData(reader.nextEvent());
+                            trace(Level.INFO, "tableColumnName is %s", tableColumnName);
+                            break;
+
+                        case ENTITY_MAPPING:
+                            entityAttributesMap = new HashMap<String,Map<String,String>>();
+                            entityClassName = new String();
+                            historyTableName = new String();
+                            tableName = new String();
+                            break;
+
+                        case HISTORY_TABLE:
+                            historyTableName = getElementData(reader.nextEvent());
+                            trace(Level.INFO, "historyTableName is %s", historyTableName);
                             break;
 
                         case HISTORY_TABLE_DATA_SOURCE:
@@ -282,30 +328,24 @@ public class HistoryTableConfiguration {
                             trace(Level.INFO, "historyTableDataSource is %s", historyTableDataSource);
                             break;
 
-                        case HISTORY_TABLE_NAME:
-                            historyTableName = getElementData(reader.nextEvent());
-                            trace(Level.INFO, "historyTableName is %s", historyTableName);
-                            break;
-
                         case HISTORY_TABLE_SUFFIX:
                             historyTableSuffix = getElementData(reader.nextEvent());
                             trace(Level.INFO, "historyTableSuffix is %s", historyTableSuffix);
                             break;
 
-                        case MAPPING:
-                            entityClassName = new String();
-                            historyTableName = new String();
-                            tableName = new String();
+                        case NAME:
+                            entityAttributeName = getElementData(reader.nextEvent());
+                            trace(Level.INFO, "entityAttributeName is %s", entityAttributeName);
+                            break;
+
+                        case TABLE:
+                            tableName = getElementData(reader.nextEvent());
+                            trace(Level.INFO, "tableName is %s", tableName);
                             break;
 
                         case TABLE_DATA_SOURCE:
                             tableDataSource = getElementData(reader.nextEvent());
                             trace(Level.INFO, "tableDataSource is %s", tableDataSource);
-                            break;
-
-                        case TABLE_NAME:
-                            tableName = getElementData(reader.nextEvent());
-                            trace(Level.INFO, "tableName is %s", tableName);
                             break;
                     }
                 }
@@ -313,18 +353,31 @@ public class HistoryTableConfiguration {
                 // Check if the event is an end element.
                 else if (event.isEndElement()) {
 
+                    trace(Level.INFO, "process end element %s", getElementName(event.asEndElement()));
+
                     switch(getElementName(event.asEndElement())) {
 
-                        case MAPPING:
+                        case ATTRIBUTE:
 
-                            // Add the entity table map.
-                            tableName = (tableName.isEmpty()) ?
-                                    getTableName(entityClassName) :
-                                    tableName;
-                            entityTableMap.put(
-                                    entityClassName,
-                                    tableName);
-                            
+                            // Add the entity attributes.
+                            tableColumnName = (tableColumnName.isEmpty()) ?
+                                entityAttributeName :
+                                tableColumnName;
+                            entityAttributes.put(entityAttributeName, tableColumnName);
+
+                            trace(Level.INFO, "entityAttributes[%s] is %s", entityAttributeName, entityAttributes.get(entityAttributeName));
+                            break;
+
+                        case ATTRIBUTES:
+
+                            // Add the entity attributes map.
+                            entityAttributesMap.put(entityClassName, entityAttributes);
+
+                            trace(Level.INFO, "entityAttributesMap[%s] is %s", entityClassName, entityAttributesMap.get(entityClassName));
+                            break;
+
+                        case ENTITY_MAPPING:
+
                             // Add the entity history table map.
                             historyTableName = (historyTableName.isEmpty()) ?
                                     getHistoryTableName(entityClassName) :
@@ -333,8 +386,16 @@ public class HistoryTableConfiguration {
                                     entityClassName,
                                     historyTableName);
 
-                            trace(Level.INFO, "entityTableMap[%s] is %s", entityClassName, entityTableMap.get(entityClassName));
+                            // Add the entity table map.
+                            tableName = (tableName.isEmpty()) ?
+                                    getTableName(entityClassName) :
+                                    tableName;
+                            entityTableMap.put(
+                                    entityClassName,
+                                    tableName);
+
                             trace(Level.INFO, "entityHistoryTableMap[%s] is %s", entityClassName, entityHistoryTableMap.get(entityClassName));
+                            trace(Level.INFO, "entityTableMap[%s] is %s", entityClassName, entityTableMap.get(entityClassName));
                             break;
                     }
                 }
