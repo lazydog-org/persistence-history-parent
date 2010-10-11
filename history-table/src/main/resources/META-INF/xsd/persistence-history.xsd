@@ -5,73 +5,67 @@
     targetNamespace="http://lazydog.org/xml/ns/persistence-history"
     elementFormDefault="qualified">
 
-    <!-- definition of simple elements -->
-    <xs:element name="class" type="xs:string"/>
-    <xs:element name="column" type="xs:string"/>
-    <xs:element name="name" type="xs:string"/>
-    <xs:element name="history-table" type="xs:string"/>
-    <xs:element name="history-table-data-source" type="xs:string"/>
-    <xs:element name="history-table-suffix" type="xs:string"/>
-    <xs:element name="table" type="xs:string"/>
-    <xs:element name="table-data-source" type="xs:string"/>
-
-    <!-- definition of complex elements -->
-    <xs:element name="attribute">
+    <xs:element name="table">
         <xs:complexType>
-            <xs:sequence>
-                <xs:element ref="name">
-                    <xs:annotation>
-                        <xs:documentation>
+            <xs:attribute name="name" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
 
-                            The attribute name.
+                        The name of the table.
 
-                        </xs:documentation>
-                    </xs:annotation>
-                </xs:element>
-                <xs:element ref="column" minOccurs="0">
-                    <xs:annotation>
-                        <xs:documentation>
+                        If no "name" is specified, the entity class will be
+                        used to derive the table name.
 
-                            The table column.
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="id" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
 
-                        </xs:documentation>
-                    </xs:annotation>
-                </xs:element>
-            </xs:sequence>
-        </xs:complexType>
-    </xs:element>
-    
-    <xs:element name="attributes">
-        <xs:complexType>
-            <xs:sequence>
-                <xs:element ref="attribute" maxOccurs="unbounded">
-                    <xs:annotation>
-                        <xs:documentation>
+                        The identifier of the table.
 
-                            An attribute for the entity.
+                        If no "id" is specified, the default identifier
+                        is the table name with "_id" appended.
 
-                            If no "column" is specified, the "name" will be
-                            used to derive the column name.
-
-                        </xs:documentation>
-                    </xs:annotation>
-                </xs:element>
-            </xs:sequence>
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
         </xs:complexType>
     </xs:element>
 
-    <xs:element name="entity-mapping">
+    <xs:element name="history-table">
+        <xs:complexType>
+            <xs:attribute name="name" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+
+                        The name of the table.
+
+                        If no "name" is specified, the table name will be
+                        used to derive the history table name.
+
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+            <xs:attribute name="id" type="xs:string">
+                <xs:annotation>
+                    <xs:documentation>
+
+                        The identifier of the history table.
+
+                        If no "id" is specified, the default identifier
+                        is the history table name with "_id" appended.
+
+                    </xs:documentation>
+                </xs:annotation>
+            </xs:attribute>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="entity">
         <xs:complexType>
             <xs:sequence>
-                <xs:element ref="class">
-                    <xs:annotation>
-                        <xs:documentation>
-
-                            The entity class.
-
-                        </xs:documentation>
-                    </xs:annotation>
-                </xs:element>
                 <xs:element ref="table" minOccurs="0">
                     <xs:annotation>
                         <xs:documentation>
@@ -90,23 +84,15 @@
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>
-                <xs:element ref="attributes" minOccurs="0" maxOccurs="unbounded">
-                    <xs:annotation>
-                        <xs:documentation>
-
-                            The attributes for the entity.
-
-                        </xs:documentation>
-                    </xs:annotation>
-                </xs:element>
             </xs:sequence>
+            <xs:attribute name="class" type="xs:string" use="required"/>
         </xs:complexType>
     </xs:element>
 
     <xs:element name="persistence-history">
         <xs:complexType>
             <xs:sequence>
-                <xs:element ref="table-data-source">
+                <xs:element name="table-data-source" type="xs:string">
                     <xs:annotation>
                         <xs:documentation>
 
@@ -115,7 +101,7 @@
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>
-                <xs:element ref="history-table-data-source">
+                <xs:element name="history-table-data-source" type="xs:string">
                     <xs:annotation>
                         <xs:documentation>
 
@@ -124,34 +110,23 @@
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>
-                <xs:element ref="history-table-suffix" minOccurs="0">
+                <xs:element name="history-table-suffix" type="xs:string" minOccurs="0">
                     <xs:annotation>
                         <xs:documentation>
 
-                            The history table suffix.  If no
-                            "history-table-suffix" is specified, the default
-                            suffix is "_history".
+                            The history table suffix.  If no history table
+                            suffix is specified, the default suffix is
+                            "_history".
 
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>
-                <xs:element ref="entity-mapping" maxOccurs="unbounded">
+                <xs:element ref="entity" maxOccurs="unbounded">
                     <xs:annotation>
                         <xs:documentation>
 
-                            The relationship between the entity, table,
-                            and history table.
+                            The entity to persist history data for.
 
-                            If no "table" is specified, the "class" will be
-                            used to derive the table name.
-
-                            If no "history-table" is specified, the
-                            "class" and "history-table-suffix" will be used to
-                            derive the history table name.
-
-                            If no "attributes" is specified, the "class"
-                            properties will be used to derive the attributes.
-                            
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>

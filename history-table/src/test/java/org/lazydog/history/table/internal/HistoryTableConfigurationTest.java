@@ -13,10 +13,6 @@ public class HistoryTableConfigurationTest {
 
     @Test
     public void testValidate() throws Exception {
-
-        // Declare.
-        PersistenceHistoryConfiguration configuration;
-
-        configuration = PersistenceHistoryConfiguration.newInstance(Level.FINEST);
+        PersistenceHistoryConfiguration.newInstance(Level.FINEST);
     }
 }

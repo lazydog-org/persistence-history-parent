@@ -37,9 +37,10 @@ public class HistoryTableListener {
     @PreUpdate
     public void setupHistoryTable(Object entity) {
 
+        // Declare.
         HistoryTable historyTable;
 
-        historyTable = new HistoryTable(entity.getClass());
+        historyTable = HistoryTable.newInstance(entity.getClass());
 
         // Check if the history table does not exist.
         if (!historyTable.exists()) {
@@ -48,25 +49,17 @@ public class HistoryTableListener {
             historyTable.create();
 
             // Populate the history table.
-            historyTable.populate(Action.INSERT, "000000000000000000000000000000000000", new Date());
+            historyTable.populate("000000000000000000000000000000000000", new Date());
         }
     }
 
     public void postChange(Object entity, Action action) {
 
-        try {
-            HistoryTable historyTable;
-            Integer id;
-            Method method;
+        // Declare.
+        HistoryTable historyTable;
 
-            historyTable = new HistoryTable(entity.getClass());
+        historyTable = HistoryTable.newInstance(entity.getClass());
 
-            method = entity.getClass().getMethod("getId", new Class[0]);
-            id = (Integer)method.invoke(entity, new Object[0]);
-            historyTable.insert(id, action, "000000000000000000000000000000000000", new Date());
-        }
-        catch(Exception e) {
-            e.printStackTrace();
-        }
+        historyTable.insert(historyTable.getId(entity), action, "000000000000000000000000000000000000", new Date());
     }
 }

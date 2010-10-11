@@ -1,11 +1,14 @@
 package org.lazydog.history.table;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -24,7 +27,10 @@ import org.lazydog.history.table.internal.PersistenceHistoryConfiguration;
  */
 public class HistoryTable<T> {
 
-    private enum COLUMN_META_DATA {
+    private static final Logger LOGGER = Logger.getLogger(HistoryTable.class.getName());
+    private static final Level DEFAULT_LOG_LEVEL = Level.FINEST;
+    
+    private static enum COLUMN_META_DATA {
         COLUMN_NAME,
         COLUMN_SIZE,
         DATA_TYPE,
@@ -33,18 +39,19 @@ public class HistoryTable<T> {
         UNSIGNED
     };
 
-    private enum TABLE_META_DATA {
+    private static enum TABLE_META_DATA {
         TABLE_NAME,
     };
-    
-    private Class<T> entityClass;
+
+    private List<Map<COLUMN_META_DATA,Object>> columnDefinitions;
     private DataSource historyTableDataSource;
+    private String historyTableIdColumnName;
     private String historyTableName;
     private DataSource tableDataSource;
-    private List<Map<COLUMN_META_DATA,Object>> columnDefinitions;
+    private String tableIdColumnName;
     private String tableName;
     
-    public HistoryTable(Class<T> entityClass) {
+    private HistoryTable(Class<T> entityClass) {
 
         try {
 
@@ -58,10 +65,20 @@ public class HistoryTable<T> {
             this.historyTableDataSource = (DataSource)context.lookup(configuration.getHistoryTableDataSource());
             this.tableDataSource = (DataSource)context.lookup(configuration.getTableDataSource());
 
-            this.entityClass = entityClass;
+            this.tableIdColumnName = configuration.getEntityTableIdColumnMap().get(entityClass.getName());
             this.tableName = configuration.getEntityTableMap().get(entityClass.getName());
+            this.historyTableIdColumnName = configuration.getEntityHistoryTableIdColumnMap().get(entityClass.getName());
             this.historyTableName = configuration.getEntityHistoryTableMap().get(entityClass.getName());
             this.columnDefinitions = getColumnDefinitions(this.tableDataSource, this.tableName);
+
+            LOGGER.setLevel(DEFAULT_LOG_LEVEL);
+            
+            trace(Level.INFO, "historyTableDataSource is %s", this.historyTableDataSource);
+            trace(Level.INFO, "tableDataSource is %s", this.tableDataSource);
+            trace(Level.INFO, "tableIdColumnName is %s", this.tableIdColumnName);
+            trace(Level.INFO, "tableName is %s", this.tableName);
+            trace(Level.INFO, "historyTableIdColumnName is %s", this.historyTableIdColumnName);
+            trace(Level.INFO, "historyTableName is %s", this.historyTableName);
         }
         catch(NamingException e) {
             e.printStackTrace();
@@ -110,6 +127,7 @@ public class HistoryTable<T> {
 
         try {
 
+            trace(Level.FINE, "create table SQL is %s", this.getCreateTableSQL());
             preparedStatement = connection.prepareStatement(this.getCreateTableSQL());
             preparedStatement.executeUpdate();
         }
@@ -274,7 +292,7 @@ public class HistoryTable<T> {
         return columnDefinitions;
     }
 
-    public String getCreateTableSQL() {
+    private String getCreateTableSQL() {
 
         // Declare.
         StringBuffer sqlStringBuffer;
@@ -313,7 +331,7 @@ public class HistoryTable<T> {
 
                 columnSql
                         .append(")")
-                        .append(((Boolean)columnDefinition.get(COLUMN_META_DATA.UNSIGNED)) ? " UNSIGNED" : "");
+                        .append(((Boolean)columnDefinition.get(COLUMN_META_DATA.UNSIGNED)) ? " unsigned" : "");
             }
 
             // Check if this is the first column.
@@ -321,7 +339,9 @@ public class HistoryTable<T> {
                 sqlStringBuffer
                         .append("create table ")
                         .append(this.historyTableName)
-                        .append(" (");
+                        .append(" (")
+                        .append(this.historyTableIdColumnName)
+                        .append(" int(10) unsigned not null auto_increment, ");
             }
             else {
                 sqlStringBuffer
@@ -334,13 +354,46 @@ public class HistoryTable<T> {
         if (sqlStringBuffer.length() > 0) {
 
             sqlStringBuffer
-                    .append(", action TINYINT(1) UNSIGNED, action_by CHAR(36), action_time DATETIME)");
+                    .append(", action tinyint(1) unsigned, action_by char(36), action_time datetime, primary key (")
+                    .append(this.historyTableIdColumnName)
+                    .append("))");
         }
 
         return sqlStringBuffer.toString();
     }
 
-    public String getInsertRowSQL() {
+    public Integer getId(Object entity) {
+
+        // Declare.
+        Integer id;
+
+        // Initialize.
+        id = null;
+
+        try {
+
+            // Declare.
+            Method method;
+            StringBuffer methodName;
+
+            methodName = new StringBuffer()
+                    .append("get")
+                    .append(this.tableIdColumnName.substring(0,1).toUpperCase())
+                    .append(this.tableIdColumnName.substring(1));
+            trace(Level.FINE, "getId method name is %s for %s", methodName, this.tableIdColumnName);
+
+            method = entity.getClass().getMethod(methodName.toString(), new Class[0]);
+            id = (Integer)method.invoke(entity, new Object[0]);
+            trace(Level.FINE, "id is %d", id);
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+
+        return id;
+    }
+
+    private String getInsertRowSQL() {
 
         // Declare.
         StringBuffer columnValuesStringBuffer;
@@ -358,9 +411,11 @@ public class HistoryTable<T> {
                 sqlStringBuffer
                         .append("insert into ")
                         .append(this.historyTableName)
-                        .append(" (");
+                        .append(" (")
+                        .append(this.historyTableIdColumnName)
+                        .append(", ");
                 columnValuesStringBuffer
-                        .append(" values (?");
+                        .append(" values (null, ?");
             }
             else {
                 sqlStringBuffer
@@ -382,7 +437,7 @@ public class HistoryTable<T> {
         return sqlStringBuffer.toString();
     }
 
-    public Map<String,Object> getRow(Integer id) {
+    private Map<String,Object> getRow(Integer id) {
 
         // Declare.
         Map<String,Object> row;
@@ -398,6 +453,7 @@ public class HistoryTable<T> {
 
         try {
 
+            trace(Level.FINE, "select row SQL is %s", this.getSelectRowSQL());
             preparedStatement = connection.prepareStatement(this.getSelectRowSQL());
             preparedStatement.setInt(1, id);
 
@@ -431,7 +487,7 @@ public class HistoryTable<T> {
         return row;
     }
 
-    public List<Map<String,Object>> getRows() {
+    private List<Map<String,Object>> getRows() {
 
         // Declare.
         List<Map<String,Object>> rows;
@@ -447,6 +503,7 @@ public class HistoryTable<T> {
 
         try {
 
+            trace(Level.FINE, "select all rows SQL is %s", this.getSelectAllRowsSQL());
             preparedStatement = connection.prepareStatement(this.getSelectAllRowsSQL());
 
             resultSet = preparedStatement.executeQuery();
@@ -488,17 +545,19 @@ public class HistoryTable<T> {
         return rows;
     }
 
-    public String getSelectAllRowsSQL() {
+    private String getSelectAllRowsSQL() {
         return new StringBuffer()
                 .append("select * from ")
                 .append(this.tableName).toString();
     }
 
-    public String getSelectRowSQL() {
+    private String getSelectRowSQL() {
         return new StringBuffer()
                 .append("select * from ")
                 .append(this.tableName)
-                .append(" where id = ?").toString();
+                .append(" where ")
+                .append(this.tableIdColumnName)
+                .append(" = ?").toString();
     }
 
     /**
@@ -527,6 +586,7 @@ public class HistoryTable<T> {
 
             row = this.getRow(id);
 
+            trace(Level.FINE, "insert row SQL is %s", this.getInsertRowSQL());
             preparedStatement = connection.prepareStatement(this.getInsertRowSQL());
 
             // Set the parameter index to one.
@@ -550,14 +610,24 @@ public class HistoryTable<T> {
         }
     }
 
+
+    /**
+     * Create a new instance of this class.
+     *
+     * @return  a new instance of this class.
+     */
+    @SuppressWarnings("unchecked")
+    public static HistoryTable newInstance(Class entityClass) {
+       return new HistoryTable(entityClass);
+    }
+
     /**
      * Populate the history table.
      *
-     * @param  action      the action.
      * @param  actionBy    the action by.
      * @param  actionTime  the action time.
      */
-    public void populate(Action action, String actionBy, Date actionTime) {
+    public void populate(String actionBy, Date actionTime) {
 
         // Declare.
         Connection connection;
@@ -575,6 +645,7 @@ public class HistoryTable<T> {
 
             rows = this.getRows();
 
+            trace(Level.FINE, "insert row SQL is %s", this.getInsertRowSQL());
             preparedStatement = connection.prepareStatement(this.getInsertRowSQL());
 
             for (Map<String,Object> row : rows) {
@@ -586,7 +657,7 @@ public class HistoryTable<T> {
                     preparedStatement.setObject(parameterIndex++, row.get((String)columnDefinition.get(COLUMN_META_DATA.COLUMN_NAME)));
                 }
 
-                preparedStatement.setObject(parameterIndex++, action.ordinal());
+                preparedStatement.setObject(parameterIndex++, Action.INSERT.ordinal());
                 preparedStatement.setObject(parameterIndex++, actionBy);
                 preparedStatement.setObject(parameterIndex++, actionTime);
                 
@@ -600,6 +671,33 @@ public class HistoryTable<T> {
         }
         finally {
             disconnect(connection, preparedStatement, null);
+        }
+    }
+
+
+    /**
+     * Create the trace log at the specified level.
+     *
+     * @param  level   the trace level.
+     * @param  format  the trace format.
+     * @param  args    the trace arguments.
+     */
+    private static void trace(Level level, String format, Object... args) {
+
+        // Check if the level is appropriate to log.
+        if (level.intValue() >= LOGGER.getLevel().intValue()) {
+
+            // Declare.
+            StringBuffer message;
+
+            // Set the trace message.
+            message = new StringBuffer();
+            message.append(String.format("[%1$tD %1$tT:%1$tL %1$tZ] ", new Date()))
+                   .append(String.format("%s ", LOGGER.getName()))
+                   .append(String.format(format, args));
+
+            // Create the trace log.
+            LOGGER.log(level, message.toString());
         }
     }
 }

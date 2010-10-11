@@ -8,6 +8,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.xml.namespace.QName;
 import javax.xml.stream.events.EndElement;
 import javax.xml.stream.events.StartElement;
 import javax.xml.stream.events.XMLEvent;
@@ -32,28 +33,29 @@ public class PersistenceHistoryConfiguration {
 
     private static final Logger LOGGER = Logger.getLogger(PersistenceHistoryConfiguration.class.getName());
     private static final String DEFAULT_HISTORY_TABLE_SUFFIX = "_history";
+    private static final String DEFAULT_TABLE_ID_COLUMN_SUFFIX = "_id";
     private static final Level DEFAULT_LOG_LEVEL = Level.WARNING;
     private static final String CONFIGURATION_FILE = "META-INF/persistence-history.xml";
     private static final String SCHEMA_FILE = "META-INF/xsd/persistence-history.xsd";
-
-    private enum ElementName {
-        ATTRIBUTE,
-        ATTRIBUTES,
-        CLASS,
-        COLUMN,
-        ENTITY_MAPPING,
+    private static enum ELEMENT_NAME {
+        ENTITY,
         HISTORY_TABLE,
         HISTORY_TABLE_DATA_SOURCE,
         HISTORY_TABLE_SUFFIX,
-        NAME,
         PERSISTENCE_HISTORY,
         TABLE_DATA_SOURCE,
         TABLE;
     };
+    private static enum ATTRIBUTE_NAME {
+        CLASS,
+        ID,
+        NAME;
+    }
 
-    private Map<String,String> entityTableMap;
+    private Map<String,String> entityHistoryTableIdColumnMap;
     private Map<String,String> entityHistoryTableMap;
-    private Map<String,Map<String,String>> entityAttributesMap;
+    private Map<String,String> entityTableIdColumnMap;
+    private Map<String,String> entityTableMap;
     private String historyTableDataSource;
     private String historyTableSuffix;
     private String tableDataSource;
@@ -81,8 +83,22 @@ public class PersistenceHistoryConfiguration {
      *
      * @return  the configuration source.
      */
-    private Source getConfigurationSource() {
+    private static Source getConfigurationSource() {
         return new StreamSource(Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIGURATION_FILE));
+    }
+
+    /**
+     * Get the attribute data.
+     *
+     * @param  event          the XML event.
+     * @param  attributeName  the attribute name.
+     *
+     * @return  the attribute data.
+     */
+    private static String getAttributeData(XMLEvent event, ATTRIBUTE_NAME attributeName) {
+        return (event.asStartElement().getAttributeByName(new QName(attributeName.toString().toLowerCase())) != null) ?
+            event.asStartElement().getAttributeByName(new QName(attributeName.toString().toLowerCase())).getValue() :
+            new String();
     }
 
     /**
@@ -103,7 +119,7 @@ public class PersistenceHistoryConfiguration {
      *
      * @return  the element name.
      */
-    private static ElementName getElementName(EndElement element) {
+    private static ELEMENT_NAME getElementName(EndElement element) {
         return getElementName(element.getName().getLocalPart());
     }
 
@@ -114,7 +130,7 @@ public class PersistenceHistoryConfiguration {
      *
      * @return  the element name.
      */
-    private static ElementName getElementName(StartElement element) {
+    private static ELEMENT_NAME getElementName(StartElement element) {
         return getElementName(element.getName().getLocalPart());
     }
 
@@ -125,17 +141,17 @@ public class PersistenceHistoryConfiguration {
      *
      * @return  the element name.
      */
-    private static ElementName getElementName(String name) {
-        return ElementName.valueOf(name.toUpperCase().replaceAll("-", "_"));
+    private static ELEMENT_NAME getElementName(String name) {
+        return ELEMENT_NAME.valueOf(name.toUpperCase().replaceAll("-", "_"));
     }
 
     /**
-     * Get the entity attributes map.
+     * Get the entity history table identifier column map.
      * 
-     * @return  the entity attributes map.
+     * @return  the entity history table identifier column map.
      */
-    public Map<String,Map<String,String>> getEntityAttributesMap() {
-        return this.entityAttributesMap;
+    public Map<String,String> getEntityHistoryTableIdColumnMap() {
+        return this.entityHistoryTableIdColumnMap;
     }
 
     /**
@@ -145,6 +161,15 @@ public class PersistenceHistoryConfiguration {
      */
     public Map<String,String> getEntityHistoryTableMap() {
         return this.entityHistoryTableMap;
+    }
+
+    /**
+     * Get the entity table identifier column map.
+     * 
+     * @return  the entity table identifier column map.
+     */
+    public Map<String,String> getEntityTableIdColumnMap() {
+        return this.entityTableIdColumnMap;
     }
 
     /**
@@ -168,13 +193,14 @@ public class PersistenceHistoryConfiguration {
     /**
      * Get the history table name.
      * 
-     * @param  entityClassName  the entity class name.
+     * @param  tableName           the table name.
+     * @param  historyTableSuffix  the history table suffix.
      * 
      * @return  the history table name.
      */
-    private String getHistoryTableName(String entityClassName) {
+    private static String getHistoryTableName(String tableName, String historyTableSuffix) {
         return new StringBuffer()
-                .append(getTableName(entityClassName))
+                .append(tableName)
                 .append((historyTableSuffix != null) ? historyTableSuffix : DEFAULT_HISTORY_TABLE_SUFFIX)
                 .toString();
     }
@@ -184,7 +210,7 @@ public class PersistenceHistoryConfiguration {
      *
      * @return  the schema source.
      */
-    private Source getSchemaSource() {
+    private static Source getSchemaSource() {
         return new StreamSource(Thread.currentThread().getContextClassLoader().getResourceAsStream(SCHEMA_FILE));
     }
 
@@ -206,6 +232,20 @@ public class PersistenceHistoryConfiguration {
      */
     public String getTableDataSource() {
         return this.tableDataSource;
+    }
+
+    /**
+     * Get the table identifier column name.
+     *
+     * @param  tableName  the table name.
+     *
+     * @return  the table identifier column name.
+     */
+    private static String getTableIdColumnName(String tableName) {
+        return new StringBuffer()
+                .append(tableName)
+                .append(DEFAULT_TABLE_ID_COLUMN_SUFFIX)
+                .toString();
     }
 
     /**
@@ -252,28 +292,28 @@ public class PersistenceHistoryConfiguration {
 
         // Get the configuration file reader.
         factory = XMLInputFactory.newInstance();
-        reader = factory.createXMLEventReader(this.getConfigurationSource());
+        reader = factory.createXMLEventReader(getConfigurationSource());
 
-        // Initialize the entity table map and entity history table map.
-        entityTableMap = new HashMap<String,String>();
+        // Initialize the various maps.
+        entityHistoryTableIdColumnMap = new HashMap<String,String>();
         entityHistoryTableMap = new HashMap<String,String>();
+        entityTableIdColumnMap = new HashMap<String,String>();
+        entityTableMap = new HashMap<String,String>();
 
         try {
 
             // Declare.
-            String entityAttributeName;
-            Map<String,String> entityAttributes;
             String entityClassName;
+            String historyTableIdColumnName;
             String historyTableName;
-            String tableColumnName;
+            String tableIdColumnName;
             String tableName;
 
             // Initialize.
-            entityAttributeName = null;
-            entityAttributes = null;
             entityClassName = null;
+            historyTableIdColumnName = null;
             historyTableName = null;
-            tableColumnName = null;
+            tableIdColumnName = null;
             tableName = null;
 
             // Loop through the XML events.
@@ -292,34 +332,19 @@ public class PersistenceHistoryConfiguration {
 
                     switch(getElementName(event.asStartElement())) {
 
-                        case ATTRIBUTE:
-                            entityAttributeName = new String();
-                            tableColumnName = new String();
-                            break;
-
-                        case ATTRIBUTES:
-                            entityAttributes = new HashMap<String,String>();
-                            break;
-                            
-                        case CLASS:
-                            entityClassName = getElementData(reader.nextEvent());
+                        case ENTITY:
+                            entityClassName = getAttributeData(event, ATTRIBUTE_NAME.CLASS);
+                            historyTableIdColumnName = new String();
+                            historyTableName = new String();
+                            tableIdColumnName = new String();
+                            tableName = new String();
                             trace(Level.INFO, "entityClassName is %s", entityClassName);
                             break;
 
-                        case COLUMN:
-                            tableColumnName = getElementData(reader.nextEvent());
-                            trace(Level.INFO, "tableColumnName is %s", tableColumnName);
-                            break;
-
-                        case ENTITY_MAPPING:
-                            entityAttributesMap = new HashMap<String,Map<String,String>>();
-                            entityClassName = new String();
-                            historyTableName = new String();
-                            tableName = new String();
-                            break;
-
                         case HISTORY_TABLE:
-                            historyTableName = getElementData(reader.nextEvent());
+                            historyTableIdColumnName = getAttributeData(event, ATTRIBUTE_NAME.ID);
+                            historyTableName = getAttributeData(event, ATTRIBUTE_NAME.NAME);
+                            trace(Level.INFO, "historyTableIdColumnName is %s", historyTableIdColumnName);
                             trace(Level.INFO, "historyTableName is %s", historyTableName);
                             break;
 
@@ -333,13 +358,10 @@ public class PersistenceHistoryConfiguration {
                             trace(Level.INFO, "historyTableSuffix is %s", historyTableSuffix);
                             break;
 
-                        case NAME:
-                            entityAttributeName = getElementData(reader.nextEvent());
-                            trace(Level.INFO, "entityAttributeName is %s", entityAttributeName);
-                            break;
-
                         case TABLE:
-                            tableName = getElementData(reader.nextEvent());
+                            tableIdColumnName = getAttributeData(event, ATTRIBUTE_NAME.ID);
+                            tableName = getAttributeData(event, ATTRIBUTE_NAME.NAME);
+                            trace(Level.INFO, "tableIdColumnName is %s", tableIdColumnName);
                             trace(Level.INFO, "tableName is %s", tableName);
                             break;
 
@@ -357,34 +379,7 @@ public class PersistenceHistoryConfiguration {
 
                     switch(getElementName(event.asEndElement())) {
 
-                        case ATTRIBUTE:
-
-                            // Add the entity attributes.
-                            tableColumnName = (tableColumnName.isEmpty()) ?
-                                entityAttributeName :
-                                tableColumnName;
-                            entityAttributes.put(entityAttributeName, tableColumnName);
-
-                            trace(Level.INFO, "entityAttributes[%s] is %s", entityAttributeName, entityAttributes.get(entityAttributeName));
-                            break;
-
-                        case ATTRIBUTES:
-
-                            // Add the entity attributes map.
-                            entityAttributesMap.put(entityClassName, entityAttributes);
-
-                            trace(Level.INFO, "entityAttributesMap[%s] is %s", entityClassName, entityAttributesMap.get(entityClassName));
-                            break;
-
-                        case ENTITY_MAPPING:
-
-                            // Add the entity history table map.
-                            historyTableName = (historyTableName.isEmpty()) ?
-                                    getHistoryTableName(entityClassName) :
-                                    historyTableName;
-                            entityHistoryTableMap.put(
-                                    entityClassName,
-                                    historyTableName);
+                        case ENTITY:
 
                             // Add the entity table map.
                             tableName = (tableName.isEmpty()) ?
@@ -394,7 +389,33 @@ public class PersistenceHistoryConfiguration {
                                     entityClassName,
                                     tableName);
 
+                            // Add the entity table id column map.
+                            tableIdColumnName = (tableIdColumnName.isEmpty()) ?
+                                    getTableIdColumnName(tableName) :
+                                    tableIdColumnName;
+                            entityTableIdColumnMap.put(
+                                    entityClassName,
+                                    tableIdColumnName);
+
+                            // Add the entity history table map.
+                            historyTableName = (historyTableName.isEmpty()) ?
+                                    getHistoryTableName(tableName, historyTableSuffix) :
+                                    historyTableName;
+                            entityHistoryTableMap.put(
+                                    entityClassName,
+                                    historyTableName);
+
+                            // Add the entity history table id column map.
+                            historyTableIdColumnName = (historyTableIdColumnName.isEmpty()) ?
+                                    getTableIdColumnName(historyTableName) :
+                                    historyTableIdColumnName;
+                            entityHistoryTableIdColumnMap.put(
+                                    entityClassName,
+                                    historyTableIdColumnName);
+
+                            trace(Level.INFO, "entityHistoryTableIdColumnMap[%s] is %s", entityClassName, entityHistoryTableIdColumnMap.get(entityClassName));
                             trace(Level.INFO, "entityHistoryTableMap[%s] is %s", entityClassName, entityHistoryTableMap.get(entityClassName));
+                            trace(Level.INFO, "entityTableIdColumnMap[%s] is %s", entityClassName, entityTableIdColumnMap.get(entityClassName));
                             trace(Level.INFO, "entityTableMap[%s] is %s", entityClassName, entityTableMap.get(entityClassName));
                             break;
                     }
@@ -462,7 +483,7 @@ public class PersistenceHistoryConfiguration {
      * @param  format  the trace format.
      * @param  args    the trace arguments.
      */
-    private void trace(Level level, String format, Object... args) {
+    private static void trace(Level level, String format, Object... args) {
 
         // Check if the level is appropriate to log.
         if (level.intValue() >= LOGGER.getLevel().intValue()) {
@@ -487,7 +508,7 @@ public class PersistenceHistoryConfiguration {
      * @throws  IOException   if unable to validate the configuration file.
      * @throws  SAXException  if unable to validate the configuration file.
      */
-    private void validate() throws IOException, SAXException {
+    private static void validate() throws IOException, SAXException {
 
         // Declare.
         SchemaFactory factory;
@@ -496,8 +517,8 @@ public class PersistenceHistoryConfiguration {
 
         // Validate the configuration file.
         factory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
-        schema = factory.newSchema(this.getSchemaSource());
+        schema = factory.newSchema(getSchemaSource());
         validator = schema.newValidator();
-        validator.validate(this.getConfigurationSource());
+        validator.validate(getConfigurationSource());
     }
 }
