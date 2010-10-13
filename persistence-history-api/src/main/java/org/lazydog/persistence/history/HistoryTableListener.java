@@ -1,6 +1,5 @@
-package org.lazydog.history.table;
+package org.lazydog.persistence.history;
 
-import java.lang.reflect.Method;
 import java.util.Date;
 import javax.persistence.PostPersist;
 import javax.persistence.PostRemove;
@@ -40,7 +39,7 @@ public class HistoryTableListener {
         // Declare.
         HistoryTable historyTable;
 
-        historyTable = HistoryTable.newInstance(entity.getClass());
+        historyTable = HistoryTableFactory.instance().createHistoryTable(entity.getClass());
 
         // Check if the history table does not exist.
         if (!historyTable.exists()) {
@@ -58,7 +57,7 @@ public class HistoryTableListener {
         // Declare.
         HistoryTable historyTable;
 
-        historyTable = HistoryTable.newInstance(entity.getClass());
+        historyTable = HistoryTableFactory.instance().createHistoryTable(entity.getClass());
 
         historyTable.insert(historyTable.getId(entity), action, "000000000000000000000000000000000000", new Date());
     }

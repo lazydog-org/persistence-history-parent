@@ -1,4 +1,4 @@
-package org.lazydog.history.table;
+package org.lazydog.persistence.history.internal;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -12,12 +12,15 @@ import java.util.logging.Logger;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Types;;
+import java.sql.SQLException;
+import java.sql.Types;
 import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
-import org.lazydog.history.table.internal.PersistenceHistoryConfiguration;
+import org.lazydog.persistence.history.Action;
+import org.lazydog.persistence.history.HistoryTable;
+import org.lazydog.persistence.history.HistoryTableException;
 
 
 /**
@@ -25,10 +28,10 @@ import org.lazydog.history.table.internal.PersistenceHistoryConfiguration;
  *
  * @author  Ron Rickard
  */
-public class HistoryTable<T> {
+public class HistoryTableImpl implements HistoryTable {
 
-    private static final Logger LOGGER = Logger.getLogger(HistoryTable.class.getName());
-    private static final Level DEFAULT_LOG_LEVEL = Level.FINEST;
+    private static final Logger LOGGER = Logger.getLogger(HistoryTableImpl.class.getName());
+    private static final Level DEFAULT_LOG_LEVEL = Level.WARNING;
     
     private static enum COLUMN_META_DATA {
         COLUMN_NAME,
@@ -44,46 +47,13 @@ public class HistoryTable<T> {
     };
 
     private List<Map<COLUMN_META_DATA,Object>> columnDefinitions;
+    private Class entityClass;
     private DataSource historyTableDataSource;
     private String historyTableIdColumnName;
     private String historyTableName;
     private DataSource tableDataSource;
     private String tableIdColumnName;
     private String tableName;
-    
-    private HistoryTable(Class<T> entityClass) {
-
-        try {
-
-            // Declare.
-            Context context;
-            PersistenceHistoryConfiguration configuration;
-
-            configuration = PersistenceHistoryConfiguration.newInstance();
-
-            context = new InitialContext();
-            this.historyTableDataSource = (DataSource)context.lookup(configuration.getHistoryTableDataSource());
-            this.tableDataSource = (DataSource)context.lookup(configuration.getTableDataSource());
-
-            this.tableIdColumnName = configuration.getEntityTableIdColumnMap().get(entityClass.getName());
-            this.tableName = configuration.getEntityTableMap().get(entityClass.getName());
-            this.historyTableIdColumnName = configuration.getEntityHistoryTableIdColumnMap().get(entityClass.getName());
-            this.historyTableName = configuration.getEntityHistoryTableMap().get(entityClass.getName());
-            this.columnDefinitions = getColumnDefinitions(this.tableDataSource, this.tableName);
-
-            LOGGER.setLevel(DEFAULT_LOG_LEVEL);
-            
-            trace(Level.INFO, "historyTableDataSource is %s", this.historyTableDataSource);
-            trace(Level.INFO, "tableDataSource is %s", this.tableDataSource);
-            trace(Level.INFO, "tableIdColumnName is %s", this.tableIdColumnName);
-            trace(Level.INFO, "tableName is %s", this.tableName);
-            trace(Level.INFO, "historyTableIdColumnName is %s", this.historyTableIdColumnName);
-            trace(Level.INFO, "historyTableName is %s", this.historyTableName);
-        }
-        catch(NamingException e) {
-            e.printStackTrace();
-        }
-    }
 
     /**
      * Connect to the database.
@@ -91,8 +61,11 @@ public class HistoryTable<T> {
      * @param  dataSource  the data source.
      *
      * @return  the database connection.
+     *
+     * @throws  SQLException  if unable to connect to the database.
      */
-    private static Connection connect(DataSource dataSource) {
+    private static Connection connect(DataSource dataSource) 
+            throws SQLException {
 
         // Declare.
         Connection connection;
@@ -100,21 +73,18 @@ public class HistoryTable<T> {
         // Initialize.
         connection = null;
 
-        try {
-
-            // Get the connection.
-            connection = dataSource.getConnection();
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
+        // Get the connection.
+        connection = dataSource.getConnection();
 
         return connection;
     }
 
     /**
      * Create the history table.
+     *
+     * @throws  HistoryTableException  if unable to create the history table.
      */
+    @Override
     public void create() {
 
         // Declare.
@@ -122,19 +92,27 @@ public class HistoryTable<T> {
         PreparedStatement preparedStatement;
 
         // Initialize.
-        connection = connect(this.historyTableDataSource);
+        connection = null;
         preparedStatement = null;
 
         try {
 
+            // Connect to the database.
+            connection = connect(this.historyTableDataSource);
+
             trace(Level.FINE, "create table SQL is %s", this.getCreateTableSQL());
+
+            // Create the history table.
             preparedStatement = connection.prepareStatement(this.getCreateTableSQL());
             preparedStatement.executeUpdate();
         }
-        catch(Exception e) {
-            e.printStackTrace();
+        catch(SQLException e) {
+            throw new HistoryTableException(this.entityClass, 
+                    "Unable to create the history table.", e);
         }
         finally {
+
+            // Disconnect from the database.
             disconnect(connection, preparedStatement, null);
         }
     }
@@ -146,7 +124,8 @@ public class HistoryTable<T> {
      * @param  preparedStatement  the prepared statement.
      * @param  resultSet          the result set.
      */
-    private static void disconnect(Connection connection, PreparedStatement preparedStatement, ResultSet resultSet) {
+    private static void disconnect(Connection connection,
+            PreparedStatement preparedStatement, ResultSet resultSet) {
 
         try {
 
@@ -172,7 +151,7 @@ public class HistoryTable<T> {
             }
         }
         catch (Exception e) {
-            e.printStackTrace();
+            // Ignore.
         }
     }
 
@@ -180,7 +159,10 @@ public class HistoryTable<T> {
      * Check if the history table exists.
      *
      * @return  true if the history table exists, otherwise false.
+     *
+     * @throws  HistoryTableException  if unable to check if the history table exists.
      */
+    @Override
     public boolean exists() {
 
         // Declare.
@@ -189,11 +171,14 @@ public class HistoryTable<T> {
         ResultSet resultSet;
 
         // Initialize.
-        connection = connect(this.historyTableDataSource);
+        connection = null;
         exists = false;
         resultSet = null;
 
         try {
+
+            // Connect to the database.
+            connection = connect(this.historyTableDataSource);
 
             // Get the table meta data for the history table.
             resultSet = connection.getMetaData().getTables(
@@ -202,17 +187,22 @@ public class HistoryTable<T> {
                     this.historyTableName,
                     null);
 
+            // Check if there is a result set.
             if (resultSet.next()) {
 
+                // Check if the result set is for the history table.
                 if (resultSet.getString(TABLE_META_DATA.TABLE_NAME.toString()).equals(this.historyTableName)) {
                     exists = true;
                 }
             }
         }
-        catch(Exception e) {
-            e.printStackTrace();
+        catch(SQLException e) {
+            throw new HistoryTableException(this.entityClass,
+                    "Unable to check if the history table exists.", e);
         }
         finally {
+
+            // Disconnect from the database.
             disconnect(connection, null, resultSet);
         }
 
@@ -226,8 +216,12 @@ public class HistoryTable<T> {
      * @param  tableName   the table name.
      * 
      * @return  the column definitions.
+     *
+     * @throws  SQLException  if unable to get the column definitions.
      */
-    private static List<Map<COLUMN_META_DATA,Object>> getColumnDefinitions(DataSource dataSource, String tableName) {
+    private static List<Map<COLUMN_META_DATA,Object>> getColumnDefinitions(
+            DataSource dataSource, String tableName)
+            throws SQLException {
 
         // Declare.
         List<Map<COLUMN_META_DATA,Object>> columnDefinitions;
@@ -236,10 +230,13 @@ public class HistoryTable<T> {
 
         // Initialize.
         columnDefinitions = new ArrayList<Map<COLUMN_META_DATA,Object>>();
-        connection = connect(dataSource);
+        connection = null;
         resultSet = null;
 
         try {
+
+            // Connect to the database.
+            connection = connect(dataSource);
 
             // Get the column meta data for the table.
             resultSet = connection.getMetaData().getColumns(
@@ -282,16 +279,20 @@ public class HistoryTable<T> {
                 columnDefinitions.add(columnDefinition);
             }
         }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
         finally {
+
+            // Disconnect from the database.
             disconnect(connection, null, resultSet);
         }
 
         return columnDefinitions;
     }
 
+    /**
+     * Get the create table SQL string.
+     *
+     * @return  the create table SQL string.
+     */
     private String getCreateTableSQL() {
 
         // Declare.
@@ -304,32 +305,32 @@ public class HistoryTable<T> {
         for (Map<COLUMN_META_DATA,Object> columnDefinition : this.columnDefinitions) {
 
             // Declare.
-            StringBuffer columnSql;
+            StringBuffer columnSqlStringBuffer;
 
             // Initialize.
-            columnSql = new StringBuffer();
+            columnSqlStringBuffer = new StringBuffer();
 
-            columnSql
+            columnSqlStringBuffer
                     .append((String)columnDefinition.get(COLUMN_META_DATA.COLUMN_NAME))
                     .append(" ")
                     .append((String)columnDefinition.get(COLUMN_META_DATA.TYPE_NAME));
 
+            // Check if the column data type is not a time or date.
             if ((Integer)columnDefinition.get(COLUMN_META_DATA.DATA_TYPE) != Types.DATE &&
                 (Integer)columnDefinition.get(COLUMN_META_DATA.DATA_TYPE) != Types.TIME &&
                 (Integer)columnDefinition.get(COLUMN_META_DATA.DATA_TYPE) != Types.TIMESTAMP) {
-
-                columnSql
+                columnSqlStringBuffer
                         .append("(")
                         .append((Integer)columnDefinition.get(COLUMN_META_DATA.COLUMN_SIZE));
 
+                // Check if the column decimal digits is not zero.
                 if ((Integer)columnDefinition.get(COLUMN_META_DATA.DECIMAL_DIGITS) != 0) {
-
-                    columnSql
+                    columnSqlStringBuffer
                             .append(",")
                             .append((Integer)columnDefinition.get(COLUMN_META_DATA.DECIMAL_DIGITS));
                 }
 
-                columnSql
+                columnSqlStringBuffer
                         .append(")")
                         .append(((Boolean)columnDefinition.get(COLUMN_META_DATA.UNSIGNED)) ? " unsigned" : "");
             }
@@ -348,11 +349,11 @@ public class HistoryTable<T> {
                         .append(", ");
             }
 
-            sqlStringBuffer.append(columnSql);
+            sqlStringBuffer.append(columnSqlStringBuffer);
         }
 
+        // Check if the SQL string buffer has data.
         if (sqlStringBuffer.length() > 0) {
-
             sqlStringBuffer
                     .append(", action tinyint(1) unsigned, action_by char(36), action_time datetime, primary key (")
                     .append(this.historyTableIdColumnName)
@@ -362,6 +363,16 @@ public class HistoryTable<T> {
         return sqlStringBuffer.toString();
     }
 
+    /**
+     * Get the identifier for the specified entity.
+     *
+     * @param  entity  the entity.
+     *
+     * @return  the identifier for the specified entity.
+     *
+     * @throws  IllegalArgumentException  if the entity is invalid.
+     */
+    @Override
     public Integer getId(Object entity) {
 
         // Declare.
@@ -376,23 +387,32 @@ public class HistoryTable<T> {
             Method method;
             StringBuffer methodName;
 
+            // Get the method name.
             methodName = new StringBuffer()
                     .append("get")
                     .append(this.tableIdColumnName.substring(0,1).toUpperCase())
                     .append(this.tableIdColumnName.substring(1));
             trace(Level.FINE, "getId method name is %s for %s", methodName, this.tableIdColumnName);
 
+            // Get the method to get the identifier.
             method = entity.getClass().getMethod(methodName.toString(), new Class[0]);
+
+            // Invoke the method to get the identifier.
             id = (Integer)method.invoke(entity, new Object[0]);
             trace(Level.FINE, "id is %d", id);
         }
         catch(Exception e) {
-            e.printStackTrace();
+            throw new IllegalArgumentException("The entity is invalid.", e);
         }
 
         return id;
     }
 
+    /**
+     * Get the insert row SQL string.
+     *
+     * @return  the insert row SQL string.
+     */
     private String getInsertRowSQL() {
 
         // Declare.
@@ -427,6 +447,7 @@ public class HistoryTable<T> {
             sqlStringBuffer.append((String)columnDefinition.get(COLUMN_META_DATA.COLUMN_NAME));
         }
 
+        // Check if the SQL string buffer has data.
         if (sqlStringBuffer.length() > 0) {
             sqlStringBuffer
                     .append(", action, action_by, action_time)")
@@ -437,7 +458,16 @@ public class HistoryTable<T> {
         return sqlStringBuffer.toString();
     }
 
-    private Map<String,Object> getRow(Integer id) {
+    /**
+     * Get the row from the source table.
+     *
+     * @param  id  the row identifier.
+     *
+     * @return  the row.
+     *
+     * @throws  SQLException  if unable to get the row.
+     */
+    private Map<String,Object> getRow(Integer id) throws SQLException {
 
         // Declare.
         Map<String,Object> row;
@@ -447,18 +477,23 @@ public class HistoryTable<T> {
 
         // Initialize.
         row = new HashMap<String,Object>();
-        connection = connect(this.tableDataSource);
+        connection = null;
         preparedStatement = null;
         resultSet = null;
 
         try {
 
+            // Connect to the database.
+            connection = connect(this.tableDataSource);
+
             trace(Level.FINE, "select row SQL is %s", this.getSelectRowSQL());
+
+            // Get the row.
             preparedStatement = connection.prepareStatement(this.getSelectRowSQL());
             preparedStatement.setInt(1, id);
-
             resultSet = preparedStatement.executeQuery();
 
+            // Check if there is a result set.
             if (resultSet.next()) {
 
                 // Loop through the column definitions.
@@ -477,17 +512,23 @@ public class HistoryTable<T> {
                 }
             }
         }
-        catch(Exception e) {
-            e.printStackTrace();
-        }
         finally {
+
+            // Disconnect from the database.
             disconnect(connection, preparedStatement, resultSet);
         }
 
         return row;
     }
 
-    private List<Map<String,Object>> getRows() {
+    /**
+     * Get the rows from the source table.
+     *
+     * @return  the rows.
+     *
+     * @throws  SQLException  if unable to get the rows.
+     */
+    private List<Map<String,Object>> getRows() throws SQLException {
 
         // Declare.
         List<Map<String,Object>> rows;
@@ -497,17 +538,22 @@ public class HistoryTable<T> {
 
         // Initialize.
         rows = new ArrayList<Map<String,Object>>();
-        connection = connect(this.tableDataSource);
+        connection = null;
         preparedStatement = null;
         resultSet = null;
 
         try {
 
-            trace(Level.FINE, "select all rows SQL is %s", this.getSelectAllRowsSQL());
-            preparedStatement = connection.prepareStatement(this.getSelectAllRowsSQL());
+            // Connect to the database.
+            connection = connect(this.tableDataSource);
 
+            trace(Level.FINE, "select all rows SQL is %s", this.getSelectAllRowsSQL());
+
+            // Get the rows.
+            preparedStatement = connection.prepareStatement(this.getSelectAllRowsSQL());
             resultSet = preparedStatement.executeQuery();
 
+            // Loop through the result sets.
             while (resultSet.next()) {
 
                 // Declare.
@@ -535,22 +581,31 @@ public class HistoryTable<T> {
                 rows.add(row);
             }
         }
-        catch(Exception e) {
-            e.printStackTrace();
-        }
         finally {
+
+            // Disconnect from the database.
             disconnect(connection, preparedStatement, resultSet);
         }
 
         return rows;
     }
 
+    /**
+     * Get the select all rows SQL string.
+     *
+     * @return  the select all rows SQL string.
+     */
     private String getSelectAllRowsSQL() {
         return new StringBuffer()
                 .append("select * from ")
                 .append(this.tableName).toString();
     }
 
+    /**
+     * Get the select row SQL string.
+     *
+     * @return  the select row SQL string.
+     */
     private String getSelectRowSQL() {
         return new StringBuffer()
                 .append("select * from ")
@@ -561,13 +616,16 @@ public class HistoryTable<T> {
     }
 
     /**
-     * Insert row in the history table.
+     * Insert a row in the history table.
      *
      * @param  id          the row identifier.
      * @param  action      the action.
      * @param  actionBy    the action by.
      * @param  actionTime  the action time.
+     *
+     * @throws  HistoryTableException  if unable to insert a row in the history table.
      */
+    @Override
     public void insert(Integer id, Action action, String actionBy, Date actionTime) {
 
         // Declare.
@@ -575,7 +633,7 @@ public class HistoryTable<T> {
         PreparedStatement preparedStatement;
 
         // Initialize.
-        connection = connect(this.historyTableDataSource);
+        connection = null;
         preparedStatement = null;
 
         try {
@@ -584,41 +642,42 @@ public class HistoryTable<T> {
             int parameterIndex;
             Map<String,Object> row;
 
+            // Get the row from the source table.
             row = this.getRow(id);
 
+            // Connect to the database.
+            connection = connect(this.historyTableDataSource);
+
             trace(Level.FINE, "insert row SQL is %s", this.getInsertRowSQL());
+
+            // Initialize the insert statement.
+            parameterIndex = 1;
             preparedStatement = connection.prepareStatement(this.getInsertRowSQL());
 
-            // Set the parameter index to one.
-            parameterIndex = 1;
+            // Loop through the column definitions.
+            for (Map<COLUMN_META_DATA,Object> columnDefinition: this.columnDefinitions) {
 
-            for (Map<COLUMN_META_DATA,Object> columnDefinition: columnDefinitions) {
+                // Set the parameters to the data from the source table.
                 preparedStatement.setObject(parameterIndex++, row.get((String)columnDefinition.get(COLUMN_META_DATA.COLUMN_NAME)));
             }
 
+            // Set the action, action by, and action time parameters.
             preparedStatement.setObject(parameterIndex++, action.ordinal());
             preparedStatement.setObject(parameterIndex++, actionBy);
             preparedStatement.setObject(parameterIndex++, actionTime);
 
+            // Insert the row in the history table.
             preparedStatement.executeUpdate();
         }
-        catch(Exception e) {
-            e.printStackTrace();
+        catch(SQLException e) {
+            throw new HistoryTableException(this.entityClass,
+                    "Unable to insert a row in the history table.", e);
         }
         finally {
+
+            // Disconnect from the database.
             disconnect(connection, preparedStatement, null);
         }
-    }
-
-
-    /**
-     * Create a new instance of this class.
-     *
-     * @return  a new instance of this class.
-     */
-    @SuppressWarnings("unchecked")
-    public static HistoryTable newInstance(Class entityClass) {
-       return new HistoryTable(entityClass);
     }
 
     /**
@@ -626,7 +685,10 @@ public class HistoryTable<T> {
      *
      * @param  actionBy    the action by.
      * @param  actionTime  the action time.
+     *
+     * @throws  HistoryTableException  if unable to populate the history table.
      */
+    @Override
     public void populate(String actionBy, Date actionTime) {
 
         // Declare.
@@ -634,7 +696,7 @@ public class HistoryTable<T> {
         PreparedStatement preparedStatement;
 
         // Initialize.
-        connection = connect(this.historyTableDataSource);
+        connection = null;
         preparedStatement = null;
 
         try {
@@ -643,37 +705,121 @@ public class HistoryTable<T> {
             int parameterIndex;
             List<Map<String,Object>> rows;
 
+            // Get the rows from the source table.
             rows = this.getRows();
 
+            // Connect to the database.
+            connection = connect(this.historyTableDataSource);
+
             trace(Level.FINE, "insert row SQL is %s", this.getInsertRowSQL());
+
+            // Initialize the insert statement batch.
             preparedStatement = connection.prepareStatement(this.getInsertRowSQL());
 
+            // Loop through the rows.
             for (Map<String,Object> row : rows) {
 
-                // Set the parameter index to one.
+                // Initialize the parameter index.
                 parameterIndex = 1;
 
-                for (Map<COLUMN_META_DATA,Object> columnDefinition: columnDefinitions) {
+                // Loop through the column definitions.
+                for (Map<COLUMN_META_DATA,Object> columnDefinition: this.columnDefinitions) {
+
+                    // Set the parameters to the data from the source table.
                     preparedStatement.setObject(parameterIndex++, row.get((String)columnDefinition.get(COLUMN_META_DATA.COLUMN_NAME)));
                 }
 
-                preparedStatement.setObject(parameterIndex++, Action.INSERT.ordinal());
+                // Set the action, action by, and action time parameters.
+                preparedStatement.setObject(parameterIndex++, Action.INITIAL.ordinal());
                 preparedStatement.setObject(parameterIndex++, actionBy);
                 preparedStatement.setObject(parameterIndex++, actionTime);
                 
                 preparedStatement.addBatch();
             }
 
+            // Insert the rows in the history table.
             preparedStatement.executeBatch();
         }
-        catch(Exception e) {
-            e.printStackTrace();
+        catch(SQLException e) {
+            throw new HistoryTableException(this.entityClass,
+                    "Unable to populate the history table.", e);
         }
         finally {
+
+            // Disconnect from the database.
             disconnect(connection, preparedStatement, null);
         }
     }
 
+    /**
+     * Set the entity class.
+     *
+     * @param  entityClass  the entity class.
+     *
+     * @throws  HistoryTableException     if unable to set the entity class.
+     * @throws  IllegalArgumentException  if the entity class is invalid.
+     */
+    public void setEntityClass(Class entityClass) {
+
+        try {
+
+            // Declare.
+            Context context;
+            PersistenceHistoryConfiguration configuration;
+
+            // Get the persistence history configuration.
+            configuration = PersistenceHistoryConfiguration.newInstance();
+
+            // Set the table and history table data sources.
+            context = new InitialContext();
+            this.tableDataSource = (DataSource)context.lookup(configuration.getTableDataSource());
+            this.historyTableDataSource = (DataSource)context.lookup(configuration.getHistoryTableDataSource());
+            
+            // Set the table name, table ID column name, history table name,
+            // and history table ID column name.
+            this.tableName = configuration.getEntityTableMap().get(entityClass.getName());
+            this.tableIdColumnName = configuration.getEntityTableIdColumnMap().get(entityClass.getName());
+            this.historyTableName = configuration.getEntityHistoryTableMap().get(entityClass.getName());
+            this.historyTableIdColumnName = configuration.getEntityHistoryTableIdColumnMap().get(entityClass.getName());
+
+            // Check if the table ID column name, table name, history table ID
+            // column name, or history table name do not exist.
+            if (this.tableName == null ||
+                this.tableName.isEmpty() ||
+                this.tableIdColumnName == null ||
+                this.tableIdColumnName.isEmpty() ||
+                this.historyTableName == null ||
+                this.historyTableName.isEmpty() ||
+                this.historyTableIdColumnName == null ||
+                this.historyTableIdColumnName.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "The entity class " + entityClass.getName() + " is invalid.");
+            }
+
+            // Set the column definitions.
+            this.columnDefinitions = getColumnDefinitions(this.tableDataSource, this.tableName);
+
+            // Set the entity class.
+            this.entityClass = entityClass;
+
+            LOGGER.setLevel(DEFAULT_LOG_LEVEL);
+
+            trace(Level.INFO, "historyTableDataSource is %s", this.historyTableDataSource);
+            trace(Level.INFO, "tableDataSource is %s", this.tableDataSource);
+            trace(Level.INFO, "tableIdColumnName is %s", this.tableIdColumnName);
+            trace(Level.INFO, "tableName is %s", this.tableName);
+            trace(Level.INFO, "historyTableIdColumnName is %s", this.historyTableIdColumnName);
+            trace(Level.INFO, "historyTableName is %s", this.historyTableName);
+        }
+        catch(NamingException e) {
+            throw new HistoryTableException(entityClass,
+                    "Unable to set the entity class due to a data source issue.", e);
+        }
+        catch(SQLException e) {
+            throw new HistoryTableException(entityClass,
+                    "Unable to set the entity class due to a SQL issue.", e);
+        }
+    }
 
     /**
      * Create the trace log at the specified level.

@@ -1,4 +1,4 @@
-package org.lazydog.history.table.internal;
+package org.lazydog.persistence.history.internal;
 
 import java.util.logging.Level;
 import org.junit.Test;
@@ -12,7 +12,7 @@ import org.junit.Test;
 public class HistoryTableConfigurationTest {
 
     @Test
-    public void testValidate() throws Exception {
+    public void testValidate() {
         PersistenceHistoryConfiguration.newInstance(Level.FINEST);
     }
 }

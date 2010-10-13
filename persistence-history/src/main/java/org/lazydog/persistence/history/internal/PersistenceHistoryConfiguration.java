@@ -1,4 +1,4 @@
-package org.lazydog.history.table.internal;
+package org.lazydog.persistence.history.internal;
 
 import java.io.IOException;
 import java.util.Date;
@@ -66,15 +66,18 @@ public class PersistenceHistoryConfiguration {
      * @param  logLevel  the log level.
      */
     private PersistenceHistoryConfiguration(Level logLevel) {
-        
+
         try {
 
+            // Set the logger level.
             LOGGER.setLevel(logLevel);
+
+            // Validate and parse the persistence history configuration file.
             validate();
             parse();
         }
         catch(Exception e) {
-            e.printStackTrace();
+            trace(Level.SEVERE, "Unable to process the " + CONFIGURATION_FILE + " file.", e);
         }
     }
 
