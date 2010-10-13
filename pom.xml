@@ -4,18 +4,18 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
                              http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>org.lazydog.history.table</groupId>
-    <artifactId>history-table-parent</artifactId>
+    <groupId>org.lazydog.persistence-history</groupId>
+    <artifactId>persistence-history-parent</artifactId>
     <packaging>pom</packaging>
     <version>1.0-SNAPSHOT</version>
-    <name>History Table Parent</name>
+    <name>Persistence History Parent</name>
     <properties>
         <netbeans.hint.deploy.server>gfv3ee6</netbeans.hint.deploy.server>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
     <scm>
-        <connection>scm:svn:https://svn.home/svn/lazydog/trunk/history-table-parent</connection>
-        <developerConnection>scm:svn:https://svn.home/svn/lazydog/trunk/history-table-parent</developerConnection>
+        <connection>scm:svn:https://svn.home/svn/lazydog/trunk/persistence-history-parent</connection>
+        <developerConnection>scm:svn:https://svn.home/svn/lazydog/trunk/persistence-history-parent</developerConnection>
     </scm>
     <build>
         <pluginManagement>
@@ -61,7 +61,7 @@
         </repository>
     </distributionManagement>
     <modules>
-        <module>history-table-spi</module>
-        <module>history-table</module>
+        <module>persistence-history-api</module>
+        <module>persistence-history</module>
   </modules>
 </project>
