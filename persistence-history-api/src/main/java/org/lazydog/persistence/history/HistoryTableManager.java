@@ -4,11 +4,11 @@ import java.util.Date;
 
 
 /**
- * History table.
+ * History table manager.
  *
  * @author  Ron Rickard
  */
-public interface HistoryTable {
+public interface HistoryTableManager {
 
     /**
      * Create the history table.

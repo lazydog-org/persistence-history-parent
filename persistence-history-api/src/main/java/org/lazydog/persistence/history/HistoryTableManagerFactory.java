@@ -4,51 +4,52 @@ import java.util.ServiceLoader;
 
 
 /**
- * History table factory.
+ * History table manager factory.
  *
  * @author  Ron Rickard
  */
-public abstract class HistoryTableFactory {
+public abstract class HistoryTableManagerFactory {
 
     /**
      * Protected constructor.
      */
-    protected HistoryTableFactory() {
+    protected HistoryTableManagerFactory() {
         // Do nothing.
     }
 
     /**
-     * Create the history table.
+     * Create the history table manager.
      *
      * @param  entityClass  the entity class.
      * 
-     * @return  the history table.
+     * @return  the history table manager.
      *
-     * @throws  IllegalArgumentException  if the entity class is invalid.
+     * @throws  IllegalArgumentException  if unable to create the history table
+     *                                    manager.
      */
-    public abstract HistoryTable createHistoryTable(Class entityClass);
+    public abstract HistoryTableManager createHistoryTableManager(Class entityClass);
 
     /**
-     * Get an instance of the history table factory.
+     * Get an instance of the history table manager factory.
      *
-     * @return  the history table factory.
+     * @return  the history table manager factory.
      *
      * @throws  IllegalArgumentException   if not exactly one factory is found.
      * @throws  ServiceConfigurationError  if unable to create the factory due
      *                                     to a provider configuration error.
      */
-    public static synchronized HistoryTableFactory instance() {
+    public static synchronized HistoryTableManagerFactory instance() {
 
         // Declare.
-        HistoryTableFactory factory;
-        ServiceLoader<HistoryTableFactory> factoryLoader;
+        HistoryTableManagerFactory factory;
+        ServiceLoader<HistoryTableManagerFactory> factoryLoader;
 
         // Initialize.
         factory = null;
-        factoryLoader = ServiceLoader.load(HistoryTableFactory.class);
+        factoryLoader = ServiceLoader.load(HistoryTableManagerFactory.class);
 
         // Loop through the services.
-        for (HistoryTableFactory loadedFactory : factoryLoader) {
+        for (HistoryTableManagerFactory loadedFactory : factoryLoader) {
 
             // Check if a factory has not been found.
             if (factory == null) {
@@ -58,14 +59,14 @@ public abstract class HistoryTableFactory {
             }
             else {
                 throw new IllegalArgumentException(
-                    "More than one history table factory found.");
+                    "More than one history table manager factory found.");
             }
         }
 
         // Check if a factory has not been found.
         if (factory == null) {
             throw new IllegalArgumentException(
-                "No history table factory found.");
+                "No history table manager factory found.");
         }
 
         return factory;

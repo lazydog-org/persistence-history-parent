@@ -19,18 +19,18 @@ import javax.naming.InitialContext;
 import javax.naming.NamingException;
 import javax.sql.DataSource;
 import org.lazydog.persistence.history.Action;
-import org.lazydog.persistence.history.HistoryTable;
+import org.lazydog.persistence.history.HistoryTableManager;
 import org.lazydog.persistence.history.HistoryTableException;
 
 
 /**
- * History table.
+ * History table manager.
  *
  * @author  Ron Rickard
  */
-public class HistoryTableImpl implements HistoryTable {
+public class HistoryTableManagerImpl implements HistoryTableManager {
 
-    private static final Logger LOGGER = Logger.getLogger(HistoryTableImpl.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(HistoryTableManagerImpl.class.getName());
     private static final Level DEFAULT_LOG_LEVEL = Level.WARNING;
     
     private static enum COLUMN_META_DATA {
@@ -756,8 +756,8 @@ public class HistoryTableImpl implements HistoryTable {
      *
      * @param  entityClass  the entity class.
      *
-     * @throws  HistoryTableException     if unable to set the entity class.
-     * @throws  IllegalArgumentException  if the entity class is invalid.
+     * @throws  IllegalArgumentException  if the entity class is invalid or
+     *                                    unable to set the entity class.
      */
     public void setEntityClass(Class entityClass) {
 
@@ -812,12 +812,16 @@ public class HistoryTableImpl implements HistoryTable {
             trace(Level.INFO, "historyTableName is %s", this.historyTableName);
         }
         catch(NamingException e) {
-            throw new HistoryTableException(entityClass,
-                    "Unable to set the entity class due to a data source issue.", e);
+            throw new IllegalArgumentException(
+                    "Unable to set the entity class to "
+                    + entityClass.getName() +
+                    " due to a data source issue.", e);
         }
         catch(SQLException e) {
-            throw new HistoryTableException(entityClass,
-                    "Unable to set the entity class due to a SQL issue.", e);
+            throw new IllegalArgumentException(
+                    "Unable to set the entity class to "
+                    + entityClass.getName() +
+                    " due to a SQL issue.", e);
         }
     }
 

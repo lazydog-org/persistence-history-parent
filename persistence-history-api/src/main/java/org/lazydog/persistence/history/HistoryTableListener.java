@@ -11,6 +11,7 @@ import javax.persistence.PostUpdate;
 import javax.persistence.PrePersist;
 import javax.persistence.PreRemove;
 import javax.persistence.PreUpdate;
+import org.lazydog.entry.EntryService;
 
 
 /**
@@ -20,78 +21,127 @@ import javax.persistence.PreUpdate;
  */
 public class HistoryTableListener {
 
-    private String getUsername() {
+    private static final String NIL_UUID = "000000000000000000000000000000000000";
+
+    /**
+     * Get the universally unique identifier (UUID).
+     *
+     * @return  the universally unique identifier (UUID).
+     */
+    private String getUuid() {
 
         // Declare.
-        String username;
+        String uuid;
 
         // Initialize.
-        username = null;
+        uuid = NIL_UUID;
 
         try {
 
             // Declare.
             Context context;
             EJBContext ejbContext;
+            String username;
 
-            // Get the caller principal name.
+            // Get the username.
             context = new InitialContext();
             ejbContext = (EJBContext)context.lookup("java:comp/EJBContext");
             username = ejbContext.getCallerPrincipal().getName();
+
+            // Check if the username exists.
+            if (username != null) {
+
+                // Declare.
+                EntryService entryService;
+
+                // Get the entry service.
+                entryService = (EntryService)context.lookup("ejb/EntryService");
+
+                // Get the UUID.
+                uuid = entryService.getUserProfile(username).getUuid();
+            }
         }
         catch (NamingException e) {
             // Ignore.
         }
 
-        return username;
+        return uuid;
     }
 
+    /**
+     * Process post persist.
+     *
+     * @param  entity  the entity.
+     */
     @PostPersist
     public void postPersist(Object entity) {
-        postChange(entity, Action.INSERT);
+        insertHistoryTable(entity, Action.INSERT);
     }
 
+    /**
+     * Process post remove.
+     *
+     * @param  entity  the entity.
+     */
     @PostRemove
     public void postRemove(Object entity) {
-        postChange(entity, Action.DELETE);
+        insertHistoryTable(entity, Action.DELETE);
     }
 
+    /**
+     * Process post update.
+     *
+     * @param  entity  the entity.
+     */
     @PostUpdate
     public void postUpdate(Object entity) {
-        postChange(entity, Action.UPDATE);
+        insertHistoryTable(entity, Action.UPDATE);
     }
 
+    /**
+     * Create the history table for the entity if it does not exist.
+     *
+     * @param  entity  the entity.
+     */
     @PrePersist
     @PreRemove
     @PreUpdate
-    public void setupHistoryTable(Object entity) {
+    public void createHistoryTable(Object entity) {
 
         // Declare.
-        HistoryTable historyTable;
+        HistoryTableManager manager;
 
-        historyTable = HistoryTableFactory.instance().createHistoryTable(entity.getClass());
+        // Get the history table manager.
+        manager = HistoryTableManagerFactory.instance().createHistoryTableManager(entity.getClass());
 
         // Check if the history table does not exist.
-        if (!historyTable.exists()) {
+        if (!manager.exists()) {
 
             // Create the history table.
-            historyTable.create();
+            manager.create();
 
             // Populate the history table.
-            historyTable.populate("000000000000000000000000000000000000", new Date());
+            manager.populate(NIL_UUID, new Date());
         }
-        System.err.println("username = " + this.getUsername());
     }
 
-    public void postChange(Object entity, Action action) {
+    /**
+     * Insert a row into the history table.
+     *
+     * @param  entity  the entity.
+     * @param  action  the action.
+     */
+    public void insertHistoryTable(Object entity, Action action) {
 
         // Declare.
-        HistoryTable historyTable;
+        HistoryTableManager manager;
 
-        historyTable = HistoryTableFactory.instance().createHistoryTable(entity.getClass());
+        // Get the history table manager.
+        manager = HistoryTableManagerFactory.instance().createHistoryTableManager(entity.getClass());
 
-        historyTable.insert(historyTable.getId(entity), action, "000000000000000000000000000000000000", new Date());
+        // Insert a row into the history table.
+        manager.insert(manager.getId(entity), action, this.getUuid(), new Date());
 
-        System.err.println("username = " + this.getUsername());
+        
     }
 }
