@@ -1,5 +1,6 @@
 package org.lazydog.persistence.history.internal;
 
+import java.io.InputStream;
 import java.io.IOException;
 import java.util.Date;
 import java.util.HashMap;
@@ -82,12 +83,21 @@ public class PersistenceHistoryConfiguration {
     }
 
     /**
+     * Get the configuration input stream.
+     * 
+     * @return  the configuration input stream.
+     */
+    private static InputStream getConfigurationInputStream() {
+        return Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIGURATION_FILE);
+    }
+
+    /**
      * Get the configuration source.
      *
      * @return  the configuration source.
      */
     private static Source getConfigurationSource() {
-        return new StreamSource(Thread.currentThread().getContextClassLoader().getResourceAsStream(CONFIGURATION_FILE));
+        return new StreamSource(getConfigurationInputStream());
     }
 
     /**
@@ -290,12 +300,12 @@ public class PersistenceHistoryConfiguration {
     private void parse() throws XMLStreamException {
 
         // Declare.
-        XMLInputFactory factory;
+        InputStream inputStream;
         XMLEventReader reader;
 
-        // Get the configuration file reader.
-        factory = XMLInputFactory.newInstance();
-        reader = factory.createXMLEventReader(getConfigurationSource());
+        // Initialize.
+        inputStream = null;
+        reader = null;
 
         // Initialize the various maps.
         entityHistoryTableIdColumnMap = new HashMap<String,String>();
@@ -307,6 +317,7 @@ public class PersistenceHistoryConfiguration {
 
             // Declare.
             String entityClassName;
+            XMLInputFactory factory;
             String historyTableIdColumnName;
             String historyTableName;
             String tableIdColumnName;
@@ -318,6 +329,11 @@ public class PersistenceHistoryConfiguration {
             historyTableName = null;
             tableIdColumnName = null;
             tableName = null;
+
+            // Get the configuration file reader.
+            factory = XMLInputFactory.newInstance();
+            inputStream = getConfigurationInputStream();
+            reader = factory.createXMLEventReader(inputStream);
 
             // Loop through the XML events.
             while (reader.hasNext()) {
@@ -427,8 +443,25 @@ public class PersistenceHistoryConfiguration {
         }
         finally {
 
-            // Close the configuration file reader.
-            reader.close();
+            // Check if the reader exists.
+            if (reader != null) {
+
+                // Close the configuration file reader.
+                reader.close();
+            }
+
+            // Check if the input stream exists.
+            if (inputStream != null) {
+
+                try {
+                    
+                    // Close the configuration file input stream.
+                    inputStream.close();
+                }
+                catch(IOException e) {
+                    // Ignore.
+                }
+            }
         }
     }
 
