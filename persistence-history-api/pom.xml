@@ -4,7 +4,7 @@
     <parent>
         <groupId>org.lazydog.persistence-history</groupId>
         <artifactId>persistence-history-parent</artifactId>
-        <version>1.1</version>
+        <version>1.2-SNAPSHOT</version>
     </parent>
     <artifactId>persistence-history-api</artifactId>
     <packaging>jar</packaging>
