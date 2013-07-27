@@ -1,7 +1,24 @@
+/**
+ * Copyright 2010-2013 lazydog.org.
+ *
+ * This file is part of persistence history.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.lazydog.persistence.history;
 
 import java.io.Serializable;
-
 
 /**
  * History table exception.
@@ -11,7 +28,7 @@ import java.io.Serializable;
 public class HistoryTableException extends RuntimeException implements Serializable {
 
     private static final long serialVersionUID = 1L;
-    private Class entityClass;
+    private Object entity;
 
     /**
      * Constructs a new exception with no message.
@@ -19,43 +36,43 @@ public class HistoryTableException extends RuntimeException implements Serializa
      * @param  entityClass  the entity class.
      *
      */
-    public HistoryTableException(Class entityClass) {
+    public HistoryTableException(Object entity) {
         super();
-        this.entityClass = entityClass;
+        this.entity = entity;
     }
 
     /**
      * Constructs a new exception with the specified message.
      *
-     * @param  entityClass  the entity class.
-     * @param  message      the message.
+     * @param  entity   the entity .
+     * @param  message  the message.
      */
-    public HistoryTableException(Class entityClass, String message) {
+    public HistoryTableException(Object entity, String message) {
         super(message);
-        this.entityClass = entityClass;
+        this.entity = entity;
     }
 
     /**
      * Constructs a new exception with the specified message and cause.
      *
-     * @param  entityClass  the entity class.
-     * @param  message      the message.
-     * @param  cause        the cause.
+     * @param  entity   the entity.
+     * @param  message  the message.
+     * @param  cause    the cause.
      */
-    public HistoryTableException(Class entityClass, String message, Throwable cause) {
+    public HistoryTableException(Object entity, String message, Throwable cause) {
         super(message, cause);
-        this.entityClass = entityClass;
+        this.entity = entity;
     }
 
     /**
      * Constructs a new exception with the specified cause.
      *
-     * @param  entityClass  the entity class.
-     * @param  cause        the cause.
+     * @param  entity  the entity.
+     * @param  cause   the cause.
      */
-    public HistoryTableException(Class entityClass, Throwable cause) {
+    public HistoryTableException(Object entity, Throwable cause) {
         super(cause);
-        this.entityClass = entityClass;
+        this.entity = entity;
     }
 
     /**
@@ -63,7 +80,7 @@ public class HistoryTableException extends RuntimeException implements Serializa
      *
      * @return  the entity class.
      */
-    public Class getEntityClass() {
-        return this.entityClass;
+    public Object getEntity() {
+        return this.entity;
     }
 }
