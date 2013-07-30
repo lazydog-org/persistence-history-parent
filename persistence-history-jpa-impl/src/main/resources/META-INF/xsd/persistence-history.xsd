@@ -110,20 +110,20 @@
     <xs:element name="persistence-history">
         <xs:complexType>
             <xs:sequence>
-                <xs:element name="table-data-source" type="xs:string">
+                <xs:element name="source-data-source" type="xs:string">
                     <xs:annotation>
                         <xs:documentation>
 
-                            The table data source.
+                            The source data source.
 
                         </xs:documentation>
                     </xs:annotation>
                 </xs:element>
-                <xs:element name="history-table-data-source" type="xs:string">
+                <xs:element name="target-data-source" type="xs:string">
                     <xs:annotation>
                         <xs:documentation>
 
-                            The history table data source.
+                            The target data source.
 
                         </xs:documentation>
                     </xs:annotation>

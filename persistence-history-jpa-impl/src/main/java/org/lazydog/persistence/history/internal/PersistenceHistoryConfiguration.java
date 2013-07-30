@@ -20,11 +20,8 @@ package org.lazydog.persistence.history.internal;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.xml.XMLConstants;
@@ -40,29 +37,30 @@ import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 import javax.xml.validation.Validator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.xml.sax.SAXException;
 
 /**
- * History table configuration.
+ * Persistence history configuration.
  *
  * @author  Ron Rickard
  */
 public class PersistenceHistoryConfiguration {
 
-    private static final Logger LOGGER = Logger.getLogger(PersistenceHistoryConfiguration.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(PersistenceHistoryConfiguration.class);
     private static final String DEFAULT_HISTORY_TABLE_SUFFIX = "_history";
     private static final String DEFAULT_TABLE_ID_COLUMN_SUFFIX = "_id";
-    private static final Level DEFAULT_LOG_LEVEL = Level.WARNING;
     private static final String CONFIGURATION_FILE = "META-INF/persistence-history.xml";
     private static final String SCHEMA_FILE = "META-INF/xsd/persistence-history.xsd";
     private static enum ELEMENT_NAME {
         ENTITY,
         HISTORY_TABLE,
-        HISTORY_TABLE_DATA_SOURCE,
         HISTORY_TABLE_SUFFIX,
         PERSISTENCE_HISTORY,
-        TABLE_DATA_SOURCE,
-        TABLE;
+        SOURCE_DATA_SOURCE,
+        TABLE,
+        TARGET_DATA_SOURCE;
     };
     private static enum ATTRIBUTE_NAME {
         CLASS,
@@ -70,32 +68,63 @@ public class PersistenceHistoryConfiguration {
         NAME;
     }
 
-    private Map<String,String> entityHistoryTableIdColumnMap;
-    private Map<String,String> entityHistoryTableMap;
-    private Map<String,String> entityTableIdColumnMap;
-    private Map<String,String> entityTableMap;
-    private String historyTableDataSource;
+    private Map<String,EntityData> entityDataMap;
     private String historyTableSuffix;
-    private String tableDataSource;
+    private String sourceDataSource;
+    private String targetDataSource;
 
     /**
      * Private constructor.
-     * 
-     * @param  logLevel  the log level.
      */
-    private PersistenceHistoryConfiguration(Level logLevel) {
+    private PersistenceHistoryConfiguration() {
 
         try {
-
-            // Set the logger level.
-            LOGGER.setLevel(logLevel);
 
             // Validate and parse the persistence history configuration file.
             validate();
             parse();
         } catch (Exception e) {
-            trace(Level.SEVERE, "Unable to process the " + CONFIGURATION_FILE + " file.", e);
+            logger.error("Unable to parse the {} file.", CONFIGURATION_FILE, e);
         }
+    }
+
+    /**
+     * Create the default history table name.
+     * 
+     * @param  tableName           the table name.
+     * @param  historyTableSuffix  the history table suffix.
+     * 
+     * @return  the default history table name.
+     */
+    private static String createDefaultHistoryTableName(String tableName, String historyTableSuffix) {
+        return new StringBuilder()
+                .append(tableName)
+                .append((historyTableSuffix != null) ? historyTableSuffix : DEFAULT_HISTORY_TABLE_SUFFIX)
+                .toString();
+    }
+    
+    /**
+     * Create the default table identifier column name.
+     *
+     * @param  tableName  the table name.
+     *
+     * @return  the default table identifier column name.
+     */
+    private static String createDefaultTableIdColumnName(String tableName) {
+        return new StringBuilder()
+                .append(tableName)
+                .append(DEFAULT_TABLE_ID_COLUMN_SUFFIX).toString();
+    }
+
+    /**
+     * Create the default table name.
+     * 
+     * @param  entityClassName  the entity class name.
+     * 
+     * @return  the default table name.
+     */
+    private static String createDefaultTableName(String entityClassName) {
+        return toUnderscore(getSimpleName(entityClassName));
     }
 
     /**
@@ -175,65 +204,36 @@ public class PersistenceHistoryConfiguration {
     }
 
     /**
-     * Get the entity history table identifier column map.
+     * Get the target data source.
      * 
-     * @return  the entity history table identifier column map.
+     * @return  the target data source.
      */
-    public Map<String,String> getEntityHistoryTableIdColumnMap() {
-        return this.entityHistoryTableIdColumnMap;
+    public String getTargetDataSource() {
+        return this.targetDataSource;
     }
 
     /**
-     * Get the entity history table map.
+     * Get the history table identifier column name for the entity class.
+     * 
+     * @param  entityClass  the entity class.
+     * 
+     * @return  the history table identifier column name.
+     */
+    public String getHistoryTableIdColumnName(Class entityClass) {
+        return this.entityDataMap.get(entityClass.getName()).getHistoryTableIdColumnName();
+    }
+
+    /**
+     * Get the history table name for the entity class.
+     * 
+     * @param  entityClass  the entity class.
      *
-     * @return  the entity history table map.
-     */
-    public Map<String,String> getEntityHistoryTableMap() {
-        return this.entityHistoryTableMap;
-    }
-
-    /**
-     * Get the entity table identifier column map.
-     * 
-     * @return  the entity table identifier column map.
-     */
-    public Map<String,String> getEntityTableIdColumnMap() {
-        return this.entityTableIdColumnMap;
-    }
-
-    /**
-     * Get the entity table map.
-     * 
-     * @return  the entity table map.
-     */
-    public Map<String,String> getEntityTableMap() {
-        return this.entityTableMap;
-    }
-
-    /**
-     * Get the history table data source.
-     * 
-     * @return  the history table data source.
-     */
-    public String getHistoryTableDataSource() {
-        return this.historyTableDataSource;
-    }
-
-    /**
-     * Get the history table name.
-     * 
-     * @param  tableName           the table name.
-     * @param  historyTableSuffix  the history table suffix.
-     * 
      * @return  the history table name.
      */
-    private static String getHistoryTableName(String tableName, String historyTableSuffix) {
-        return new StringBuilder()
-                .append(tableName)
-                .append((historyTableSuffix != null) ? historyTableSuffix : DEFAULT_HISTORY_TABLE_SUFFIX)
-                .toString();
+    public String getHistoryTableName(Class entityClass) {
+        return this.entityDataMap.get(entityClass.getName()).getHistoryTableName();
     }
-    
+
     /**
      * Get the schema source.
      *
@@ -255,45 +255,43 @@ public class PersistenceHistoryConfiguration {
     }
 
     /**
-     * Get the table data source.
+     * Get the source data source.
      *
-     * @return  the table data source.
+     * @return  the source data source.
      */
-    public String getTableDataSource() {
-        return this.tableDataSource;
+    public String getSourceDataSource() {
+        return this.sourceDataSource;
     }
 
     /**
-     * Get the table identifier column name.
-     *
-     * @param  tableName  the table name.
-     *
+     * Get the table identifier column name for the entity class.
+     * 
+     * @param  entityClass  the entity class.
+     * 
      * @return  the table identifier column name.
      */
-    private static String getTableIdColumnName(String tableName) {
-        return new StringBuilder()
-                .append(tableName)
-                .append(DEFAULT_TABLE_ID_COLUMN_SUFFIX).toString();
+    public String getTableIdColumnName(Class entityClass) {
+        return this.entityDataMap.get(entityClass.getName()).getTableIdColumnName();
     }
 
     /**
-     * Get the table name.
+     * Get the table name for the entity class.
      * 
-     * @param  entityClassName  the entity class name.
+     * @param  entityClass  the entity class.
      * 
      * @return  the table name.
      */
-    private static String getTableName(String entityClassName) {
-        return toUnderscore(getSimpleName(entityClassName));
+    public String getTableName(Class entityClass) {
+        return this.entityDataMap.get(entityClass.getName()).getTableName();
     }
 
     /**
-     * Create a new instance of this class.
+     * Create a new instance of the persistence history configuration class.
      *
-     * @return  a new instance of this class.
+     * @return  a new instance of the persistence history configuration class.
      */
     public static PersistenceHistoryConfiguration newInstance() {
-       return new PersistenceHistoryConfiguration(DEFAULT_LOG_LEVEL);
+       return new PersistenceHistoryConfiguration();
     }
 
     /**
@@ -306,11 +304,7 @@ public class PersistenceHistoryConfiguration {
         InputStream inputStream = null;
         XMLEventReader reader = null;
 
-        // Initialize the various maps.
-        this.entityHistoryTableIdColumnMap = new HashMap<String,String>();
-        this.entityHistoryTableMap = new HashMap<String,String>();
-        this.entityTableIdColumnMap = new HashMap<String,String>();
-        this.entityTableMap = new HashMap<String,String>();
+        this.entityDataMap = new HashMap<String,EntityData>();
 
         try {
 
@@ -334,7 +328,7 @@ public class PersistenceHistoryConfiguration {
                 // Check if the event is a start element.
                 if (event.isStartElement()) {
 
-                    trace(Level.INFO, "process start element %s", getElementName(event.asStartElement()));
+                    logger.trace("process start element {}", getElementName(event.asStartElement()));
 
                     switch(getElementName(event.asStartElement())) {
 
@@ -344,36 +338,36 @@ public class PersistenceHistoryConfiguration {
                             historyTableName = new String();
                             tableIdColumnName = new String();
                             tableName = new String();
-                            trace(Level.INFO, "entityClassName is %s", entityClassName);
+                            logger.trace("entityClassName is {}", entityClassName);
                             break;
 
                         case HISTORY_TABLE:
                             historyTableIdColumnName = getAttributeData(event, ATTRIBUTE_NAME.ID);
                             historyTableName = getAttributeData(event, ATTRIBUTE_NAME.NAME);
-                            trace(Level.INFO, "historyTableIdColumnName is %s", historyTableIdColumnName);
-                            trace(Level.INFO, "historyTableName is %s", historyTableName);
-                            break;
-
-                        case HISTORY_TABLE_DATA_SOURCE:
-                            historyTableDataSource = getElementData(reader.nextEvent());
-                            trace(Level.INFO, "historyTableDataSource is %s", historyTableDataSource);
+                            logger.trace("historyTableIdColumnName is {}", historyTableIdColumnName);
+                            logger.trace("historyTableName is {}", historyTableName);
                             break;
 
                         case HISTORY_TABLE_SUFFIX:
-                            historyTableSuffix = getElementData(reader.nextEvent());
-                            trace(Level.INFO, "historyTableSuffix is %s", historyTableSuffix);
+                            this.historyTableSuffix = getElementData(reader.nextEvent());
+                            logger.trace("historyTableSuffix is {}", this.historyTableSuffix);
                             break;
-
+                            
+                        case SOURCE_DATA_SOURCE:
+                            this.sourceDataSource = getElementData(reader.nextEvent());
+                            logger.trace("sourceDataSource is {}", this.sourceDataSource);
+                            break;
+    
                         case TABLE:
                             tableIdColumnName = getAttributeData(event, ATTRIBUTE_NAME.ID);
                             tableName = getAttributeData(event, ATTRIBUTE_NAME.NAME);
-                            trace(Level.INFO, "tableIdColumnName is %s", tableIdColumnName);
-                            trace(Level.INFO, "tableName is %s", tableName);
+                            logger.trace("tableIdColumnName is {}", tableIdColumnName);
+                            logger.trace("tableName is {}", tableName);
                             break;
-
-                        case TABLE_DATA_SOURCE:
-                            tableDataSource = getElementData(reader.nextEvent());
-                            trace(Level.INFO, "tableDataSource is %s", tableDataSource);
+                            
+                        case TARGET_DATA_SOURCE:
+                            this.targetDataSource = getElementData(reader.nextEvent());
+                            logger.trace("targetDataSource is {}", this.targetDataSource);
                             break;
                     }
                 }
@@ -381,32 +375,32 @@ public class PersistenceHistoryConfiguration {
                 // Check if the event is an end element.
                 else if (event.isEndElement()) {
 
-                    trace(Level.INFO, "process end element %s", getElementName(event.asEndElement()));
+                    logger.trace("process end element {}", getElementName(event.asEndElement()));
 
                     switch(getElementName(event.asEndElement())) {
 
                         case ENTITY:
 
-                            // Add the entity table map.
-                            tableName = (tableName.isEmpty()) ? getTableName(entityClassName) : tableName;
-                            this.entityTableMap.put(entityClassName, tableName);
+                            // Finalize the entity data properties.
+                            tableName = (tableName.isEmpty()) ? createDefaultTableName(entityClassName) : tableName;
+                            tableIdColumnName = (tableIdColumnName.isEmpty()) ? createDefaultTableIdColumnName(tableName) : tableIdColumnName;
+                            historyTableName = (historyTableName.isEmpty()) ? createDefaultHistoryTableName(tableName, this.historyTableSuffix) : historyTableName;
+                            historyTableIdColumnName = (historyTableIdColumnName.isEmpty()) ? createDefaultTableIdColumnName(historyTableName) : historyTableIdColumnName;
 
-                            // Add the entity table id column map.
-                            tableIdColumnName = (tableIdColumnName.isEmpty()) ? getTableIdColumnName(tableName) : tableIdColumnName;
-                            this.entityTableIdColumnMap.put(entityClassName, tableIdColumnName);
-
-                            // Add the entity history table map.
-                            historyTableName = (historyTableName.isEmpty()) ? getHistoryTableName(tableName, historyTableSuffix) : historyTableName;
-                            this.entityHistoryTableMap.put(entityClassName, historyTableName);
-
-                            // Add the entity history table id column map.
-                            historyTableIdColumnName = (historyTableIdColumnName.isEmpty()) ? getTableIdColumnName(historyTableName) : historyTableIdColumnName;
-                            this.entityHistoryTableIdColumnMap.put(entityClassName, historyTableIdColumnName);
-
-                            trace(Level.INFO, "entityHistoryTableIdColumnMap[%s] is %s", entityClassName, this.entityHistoryTableIdColumnMap.get(entityClassName));
-                            trace(Level.INFO, "entityHistoryTableMap[%s] is %s", entityClassName, this.entityHistoryTableMap.get(entityClassName));
-                            trace(Level.INFO, "entityTableIdColumnMap[%s] is %s", entityClassName, this.entityTableIdColumnMap.get(entityClassName));
-                            trace(Level.INFO, "entityTableMap[%s] is %s", entityClassName, this.entityTableMap.get(entityClassName));
+                            logger.debug("tableName is {} for entity {}", tableName, entityClassName);
+                            logger.debug("tableIdColumnName is {} for entity {}", tableIdColumnName, entityClassName);
+                            logger.debug("historyTableName is {} for entity {}", historyTableName, entityClassName);
+                            logger.debug("historyTableIdColumnName is {} for entity {}", historyTableIdColumnName, entityClassName);
+                            
+                            // Create the entity data.
+                            EntityData entityData = new EntityData();
+                            entityData.setHistoryTableIdColumnName(historyTableIdColumnName);
+                            entityData.setHistoryTableName(historyTableName);
+                            entityData.setTableIdColumnName(tableIdColumnName);
+                            entityData.setTableName(tableName);
+                            
+                            // Put the entity data on the map.
+                            this.entityDataMap.put(entityClassName, entityData);
                             break;
                     }
                 }
@@ -428,7 +422,7 @@ public class PersistenceHistoryConfiguration {
                     // Close the configuration file input stream.
                     inputStream.close();
                 } catch (IOException e) {
-                    // Ignore.
+                    logger.error("Unable to close the input stream.", e);
                 }
             }
         }
@@ -475,32 +469,6 @@ public class PersistenceHistoryConfiguration {
     }
 
     /**
-     * Create the trace log at the specified level.
-     *
-     * @param  level   the trace level.
-     * @param  format  the trace format.
-     * @param  args    the trace arguments.
-     */
-    private static void trace(Level level, String format, Object... args) {
-
-        // Check if the level is appropriate to log.
-        if (level.intValue() >= LOGGER.getLevel().intValue()) {
-
-            // Declare.
-            StringBuffer message;
-
-            // Set the trace message.
-            message = new StringBuffer();
-            message.append(String.format("[%1$tD %1$tT:%1$tL %1$tZ] ", new Date()))
-                   .append(String.format("%s ", LOGGER.getName()))
-                   .append(String.format(format, args));
-
-            // Create the trace log.
-            LOGGER.log(level, message.toString());
-        }
-    }
-
-    /**
      * Validate the configuration file.
      *
      * @throws  IOException   if unable to validate the configuration file.
@@ -512,5 +480,88 @@ public class PersistenceHistoryConfiguration {
         Schema schema = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).newSchema(getSchemaSource());
         Validator validator = schema.newValidator();
         validator.validate(getConfigurationSource());
+    }
+    
+    /**
+     * Entity data.
+     */
+    private class EntityData {
+        
+        private String historyTableIdColumnName;
+        private String historyTableName;
+        private String tableIdColumnName;
+        private String tableName; 
+        
+        /**
+         * Get the history table identifier column name.
+         * 
+         * @return  the history table identifier column name.
+         */
+        public String getHistoryTableIdColumnName() {
+            return this.historyTableIdColumnName;
+        }
+        
+        /**
+         * Get the history table name.
+         * 
+         * @return  the history table name.
+         */
+        public String getHistoryTableName() {
+            return this.historyTableName;
+        }
+        
+        /**
+         * Get the table identifier column name.
+         * 
+         * @return  the table identifier column name.
+         */
+        public String getTableIdColumnName() {
+            return this.tableIdColumnName;
+        }
+        
+        /**
+         * Get the table name.
+         * 
+         * @return  the table name.
+         */
+        public String getTableName() {
+            return this.tableName;
+        }
+        
+        /**
+         * Set the history table identifier column name.
+         * 
+         * @param  historyTableIdColumnName  the history table identifier column name.
+         */
+        public void setHistoryTableIdColumnName(String historyTableIdColumnName) {
+            this.historyTableIdColumnName = historyTableIdColumnName;
+        }
+        
+        /**
+         * Set the history table name.
+         * 
+         * @param  historyTableName  the history table name.
+         */
+        public void setHistoryTableName(String historyTableName) {
+            this.historyTableName = historyTableName;
+        }
+        
+        /**
+         * Set the table identifier column name.
+         * 
+         * @param  tableIdColumnName  the table identifier column name.
+         */
+        public void setTableIdColumnName(String tableIdColumnName) {
+            this.tableIdColumnName = tableIdColumnName;
+        }
+        
+        /**
+         * Set the table name.
+         * 
+         * @param  tableName  the table name.
+         */
+        public void setTableName(String tableName) {
+            this.tableName = tableName;
+        }
     }
 }

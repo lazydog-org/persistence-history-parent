@@ -5,22 +5,22 @@
     xsi:schemaLocation="http://lazydog.org/xml/ns/persistence-history
                         http://lazydog.org/xml/ns/persistence-history/persistence-history.xsd">
 
-    <table-data-source>jdbc/ComicPool</table-data-source>
-    <history-table-data-source>jdbc/ComicHistoryPool</history-table-data-source>
+    <source-data-source>jdbc/AddressbookPool</source-data-source>
+    <target-data-source>jdbc/AddressbookHistoryPool</target-data-source>
     <history-table-suffix>_audit</history-table-suffix>
-    <entity class="org.lazydog.comic.model.Category"/>
-    <entity class="org.lazydog.comic.model.Character">
+    <entity class="org.lazydog.addressbook.model.Address"/>
+    <entity class="org.lazydog.addressbook.model.Company">
         <table id="id"/>
     </entity>
-    <entity class="org.lazydog.comic.model.Comic">
-        <table name="comic_test"/>
+    <entity class="org.lazydog.addressbook.model.Department">
+        <table name="department_test"/>
     </entity>
-    <entity class="org.lazydog.comic.model.ComicType">
-        <table name="comic_type_test" id="id"/>
-        <history-table name="comic_type_test_history" id="history_id"/>
+    <entity class="org.lazydog.addressbook.model.Employee">
+        <table name="employee_test" id="id"/>
+        <history-table name="employee_test_history" id="history_id"/>
     </entity>
-    <entity class="org.lazydog.comic.model.Title">
-        <table name="title_test"/>
-        <history-table name="title_test_history"/>
+    <entity class="org.lazydog.addressbook.model.Phone">
+        <table name="phone_test"/>
+        <history-table name="phone_test_history"/>
     </entity>
 </persistence-history>

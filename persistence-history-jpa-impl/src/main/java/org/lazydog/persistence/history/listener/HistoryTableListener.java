@@ -31,6 +31,8 @@ import javax.persistence.PreRemove;
 import javax.persistence.PreUpdate;
 import org.lazydog.persistence.history.HistoryTable;
 import org.lazydog.persistence.history.HistoryTableFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * History table listener.
@@ -39,56 +41,41 @@ import org.lazydog.persistence.history.HistoryTableFactory;
  */
 public class HistoryTableListener {
 
-    /**
-     * Get the username
-     *
-     * @return  the username.
-     */
-    private String getUsername() {
-
-        String username = null;
-
-        try {
-
-            // Get the username.
-            Context context = new InitialContext();
-            EJBContext ejbContext = (EJBContext)context.lookup("java:comp/EJBContext");
-            username = ejbContext.getCallerPrincipal().getName();
-        } catch (NamingException e) {
-            // Ignore.
-        }
-
-        return username;
-    }
+    private static final Logger logger = LoggerFactory.getLogger(HistoryTableListener.class);
+    private static final String DEFAULT_USERNAME = "default";
+    private static final String INITIAL_CREATION_USERNAME = "initial_creation";
 
     /**
-     * Process post persist.
+     * Insert a persist row into the history table.
      *
      * @param  entity  the entity.
      */
     @PostPersist
-    public void postPersist(Object entity) {
-        insertHistoryTable(entity, HistoryTable.Action.INSERT);
+    public void insertPersistRow(Object entity) {
+        logger.debug("Persisting entity {}.", entity.getClass().getSimpleName());
+        insertRow(entity, HistoryTable.Action.INSERT);
     }
 
     /**
-     * Process post remove.
+     * Insert a remove row into the history table.
      *
      * @param  entity  the entity.
      */
     @PostRemove
-    public void postRemove(Object entity) {
-        insertHistoryTable(entity, HistoryTable.Action.DELETE);
+    public void insertRemoveRow(Object entity) {
+        logger.debug("Removing entity {}.", entity.getClass().getSimpleName());
+        insertRow(entity, HistoryTable.Action.DELETE);
     }
 
     /**
-     * Process post update.
+     * Insert an update row into the history table.
      *
      * @param  entity  the entity.
      */
     @PostUpdate
-    public void postUpdate(Object entity) {
-        insertHistoryTable(entity, HistoryTable.Action.UPDATE);
+    public void insertUpdateRow(Object entity) {
+        logger.debug("Updating entity {}.", entity.getClass().getSimpleName());
+        insertRow(entity, HistoryTable.Action.UPDATE);
     }
 
     /**
@@ -108,11 +95,36 @@ public class HistoryTableListener {
         if (!historyTable.exists()) {
 
             // Create the history table.
+            logger.debug("Creating the history table for entity {}.", entity.getClass().getSimpleName());
             historyTable.create();
 
             // Populate the history table.
-            historyTable.populate("initial_creation", new Date());
+            logger.debug("Populating the history table for entity {}.", entity.getClass().getSimpleName());
+            historyTable.populate(INITIAL_CREATION_USERNAME, new Date());
         }
+    }
+    
+    /**
+     * Get the username
+     *
+     * @return  the username.
+     */
+    private String getUsername() {
+
+        String username;
+
+        try {
+
+            // Get the username.
+            Context context = new InitialContext();
+            EJBContext ejbContext = (EJBContext)context.lookup("java:comp/EJBContext");
+            username = ejbContext.getCallerPrincipal().getName();
+        } catch (NamingException e) {
+            username = DEFAULT_USERNAME;
+            logger.info("Unable to get the username.  Reverting to '{}'.", username);
+        }
+
+        return username;
     }
 
     /**
@@ -121,12 +133,7 @@ public class HistoryTableListener {
      * @param  entity  the entity.
      * @param  action  the action.
      */
-    private void insertHistoryTable(Object entity, HistoryTable.Action action) {
-
-        // Get the history table.
-        HistoryTable historyTable = HistoryTableFactory.newInstance().getHistoryTable(entity);
-
-        // Insert a row into the history table.
-        historyTable.insert(action, this.getUsername(), new Date());
+    private void insertRow(Object entity, HistoryTable.Action action) {
+        HistoryTableFactory.newInstance().getHistoryTable(entity).insert(action, this.getUsername(), new Date());
     }
 }

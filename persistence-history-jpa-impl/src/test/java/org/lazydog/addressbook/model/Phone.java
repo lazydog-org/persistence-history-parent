@@ -16,19 +16,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.lazydog.persistence.history.internal;
+package org.lazydog.addressbook.model;
 
-import org.junit.Test;
-
-/**
- * History table configuration test.
- *
- * @author  Ron Rickard
- */
-public class HistoryTableConfigurationTest {
-
-    @Test
-    public void testValidate() {
-        PersistenceHistoryConfiguration.newInstance();
-    }
+public class Phone {  
 }

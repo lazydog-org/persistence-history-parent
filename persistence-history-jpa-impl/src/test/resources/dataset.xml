@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dataset>
+    <address id="1" city="Los Angeles" state="California" street_address="111 Street Avenue" zipcode="11111"/>
+    <address id="2" city="Phoenix" state="Arizona" street_address="222 Street Avenue" zipcode="22222"/>
+</dataset>

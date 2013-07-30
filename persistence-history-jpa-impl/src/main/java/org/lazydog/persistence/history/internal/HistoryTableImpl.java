@@ -37,6 +37,7 @@ import javax.naming.NamingException;
 import javax.sql.DataSource;
 import org.lazydog.persistence.history.HistoryTable;
 import org.lazydog.persistence.history.HistoryTableException;
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
@@ -46,7 +47,7 @@ import org.slf4j.LoggerFactory;
  */
 public class HistoryTableImpl implements HistoryTable {
 
-    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(HistoryTableImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(HistoryTableImpl.class);
     
     private static enum COLUMN_META_DATA {
         COLUMN_NAME,
@@ -63,37 +64,50 @@ public class HistoryTableImpl implements HistoryTable {
 
     private List<Map<COLUMN_META_DATA,Object>> columnDefinitions;
     private Object entity;
-    private DataSource historyTableDataSource;
     private String historyTableIdColumnName;
     private String historyTableName;
-    private DataSource tableDataSource;
+    private DataSource sourceDataSource;
     private String tableIdColumnName;
     private String tableName;
+    private DataSource targetDataSource;
 
     /**
      * Hide the constructor.
      * 
-     * @param  entity  the entity.
+     * @param  entity            the entity.
+     * @param  sourceDataSource  the source data source.
+     * @param  targetDataSource  the target data source.
      * 
      * @throws  IllegalArgumentException  if the entity is invalid.
      */
-    private HistoryTableImpl(Object entity) throws IllegalArgumentException {
+    private HistoryTableImpl(final Object entity, final DataSource sourceDataSource, final DataSource targetDataSource) throws IllegalArgumentException {
         
         try {
 
             // Get the persistence history configuration.
             PersistenceHistoryConfiguration configuration = PersistenceHistoryConfiguration.newInstance();
 
-            // Set the table and history table data sources.
             Context context = new InitialContext();
-            this.tableDataSource = (DataSource)context.lookup(configuration.getTableDataSource());
-            this.historyTableDataSource = (DataSource)context.lookup(configuration.getHistoryTableDataSource());
+            
+            // Lookup the source data source in JNDI if necessary.
+            if (sourceDataSource == null) {
+                this.sourceDataSource = (DataSource)context.lookup(configuration.getSourceDataSource());
+            } else {
+                this.sourceDataSource = sourceDataSource;
+            }
+            
+            // Lookup the target data source in JNDI if necessary.
+            if (targetDataSource == null) {
+                this.targetDataSource = (DataSource)context.lookup(configuration.getTargetDataSource());
+            } else {
+                this.targetDataSource = targetDataSource;
+            }
             
             // Set the table name, table ID column name, history table name, and history table ID column name.
-            this.tableName = configuration.getEntityTableMap().get(entity.getClass().getName());
-            this.tableIdColumnName = configuration.getEntityTableIdColumnMap().get(entity.getClass().getName());
-            this.historyTableName = configuration.getEntityHistoryTableMap().get(entity.getClass().getName());
-            this.historyTableIdColumnName = configuration.getEntityHistoryTableIdColumnMap().get(entity.getClass().getName());
+            this.tableName = configuration.getTableName(entity.getClass());
+            this.tableIdColumnName = configuration.getTableIdColumnName(entity.getClass());
+            this.historyTableName = configuration.getHistoryTableName(entity.getClass());
+            this.historyTableIdColumnName = configuration.getHistoryTableIdColumnName(entity.getClass());
 
             // Check if the table name, table ID column name, history table name, or history table ID column name do not exist.
             if (this.tableName == null ||
@@ -108,14 +122,14 @@ public class HistoryTableImpl implements HistoryTable {
             }
 
             // Set the column definitions.
-            this.columnDefinitions = getColumnDefinitions(this.tableDataSource, this.tableName);
+            this.columnDefinitions = getColumnDefinitions(this.sourceDataSource, this.tableName);
 
             // Set the entity class.
             this.entity = entity;
 
-            logger.info("The history table data source is {}.", this.historyTableDataSource);
-            logger.info("The table data source is {}.", this.tableDataSource);
-            logger.info("The table ID  column name is {}.", this.tableIdColumnName);
+            logger.info("The target data source is {}.", this.targetDataSource);
+            logger.info("The source data source is {}.", this.sourceDataSource);
+            logger.info("The table ID column name is {}.", this.tableIdColumnName);
             logger.info("The table name is {}.", this.tableName);
             logger.info("The history table ID column name is {}.", this.historyTableIdColumnName);
             logger.info("The history table name is {}.", this.historyTableName);
@@ -135,7 +149,7 @@ public class HistoryTableImpl implements HistoryTable {
      *
      * @throws  SQLException  if unable to connect to the database.
      */
-    private static Connection connect(DataSource dataSource) throws SQLException {
+    private static Connection connect(final DataSource dataSource) throws SQLException {
         return dataSource.getConnection();
     }
 
@@ -152,8 +166,8 @@ public class HistoryTableImpl implements HistoryTable {
 
         try {
 
-            // Connect to the database.
-            connection = connect(this.historyTableDataSource);
+            // Connect to the target database.
+            connection = connect(this.targetDataSource);
 
             // Create the history table.
             String createTableSQL = this.createCreateTableSQL();
@@ -278,18 +292,6 @@ public class HistoryTableImpl implements HistoryTable {
     }
 
     /**
-     * Create the select all rows SQL string.
-     *
-     * @return  the select all rows SQL string.
-     */
-    private String createSelectRowsSQL() {
-        return new StringBuilder()
-                .append("select * from ")
-                .append(this.tableName)
-                .toString();
-    }
-
-    /**
      * Create the select row SQL string.
      *
      * @return  the select row SQL string.
@@ -305,13 +307,25 @@ public class HistoryTableImpl implements HistoryTable {
     }
 
     /**
+     * Create the select all rows SQL string.
+     *
+     * @return  the select all rows SQL string.
+     */
+    private String createSelectRowsSQL() {
+        return new StringBuilder()
+                .append("select * from ")
+                .append(this.tableName)
+                .toString();
+    }
+
+    /**
      * Disconnect from the database.
      *
      * @param  connection         the database connection.
      * @param  preparedStatement  the prepared statement.
      * @param  resultSet          the result set.
      */
-    private static void disconnect(Connection connection, PreparedStatement preparedStatement, ResultSet resultSet) {
+    private static void disconnect(final Connection connection, final PreparedStatement preparedStatement, final ResultSet resultSet) {
 
         try {
 
@@ -356,8 +370,8 @@ public class HistoryTableImpl implements HistoryTable {
 
         try {
 
-            // Connect to the database.
-            connection = connect(this.historyTableDataSource);
+            // Connect to the target database.
+            connection = connect(this.targetDataSource);
 
             // Get the table meta data for the history table.
             resultSet = connection.getMetaData().getTables(null, null, this.historyTableName, null);
@@ -391,7 +405,7 @@ public class HistoryTableImpl implements HistoryTable {
      *
      * @throws  SQLException  if unable to get the column definitions.
      */
-    private static List<Map<COLUMN_META_DATA,Object>> getColumnDefinitions(DataSource dataSource, String tableName) throws SQLException {
+    private static List<Map<COLUMN_META_DATA,Object>> getColumnDefinitions(final DataSource dataSource, final String tableName) throws SQLException {
 
         List<Map<COLUMN_META_DATA,Object>> columnDefinitions = new ArrayList<Map<COLUMN_META_DATA,Object>>();
         Connection connection = null;
@@ -403,7 +417,15 @@ public class HistoryTableImpl implements HistoryTable {
             connection = connect(dataSource);
 
             // Get the column meta data for the table.
-            resultSet = connection.getMetaData().getColumns(null, null, tableName, null);
+            // TODO: store this information in a dialect class.
+            String actualTableName = tableName;
+            if (connection.getMetaData().storesLowerCaseIdentifiers()) {
+                actualTableName = tableName.toLowerCase();
+            }
+            if (connection.getMetaData().storesUpperCaseIdentifiers()) {
+                actualTableName = tableName.toUpperCase();
+            }
+            resultSet = connection.getMetaData().getColumns(null, null, actualTableName, null);
 
             // Check if there is column meta data.
             while (resultSet.next()) {
@@ -417,6 +439,13 @@ public class HistoryTableImpl implements HistoryTable {
                 Boolean unsigned = (typeName.indexOf(" " + COLUMN_META_DATA.UNSIGNED.toString()) != -1);
                 typeName = typeName.replace(" " + COLUMN_META_DATA.UNSIGNED.toString(), "");
 
+                logger.debug("columnName is {}", columnName);
+                logger.debug("columnSize is {}", columnSize);
+                logger.debug("dataType is {}", dataType);
+                logger.debug("decimalDigits is {}", decimalDigits);
+                logger.debug("typeName is {}", typeName);
+                logger.debug("unsigned is {}", unsigned);
+                
                 // Put the column meta data in the definition.
                 Map<COLUMN_META_DATA,Object> columnDefinition = new EnumMap<COLUMN_META_DATA,Object>(COLUMN_META_DATA.class);
                 columnDefinition.put(COLUMN_META_DATA.COLUMN_NAME, columnName);
@@ -471,7 +500,7 @@ public class HistoryTableImpl implements HistoryTable {
      *
      * @throws  SQLException  if unable to get the row.
      */
-    private Map<String,Object> getRow(Integer id) throws SQLException {
+    private Map<String,Object> getRow(final Integer id) throws SQLException {
 
         Map<String,Object> row = new HashMap<String,Object>();
         Connection connection = null;
@@ -480,8 +509,8 @@ public class HistoryTableImpl implements HistoryTable {
 
         try {
 
-            // Connect to the database.
-            connection = connect(this.tableDataSource);
+            // Connect to the source database.
+            connection = connect(this.sourceDataSource);
 
             // Get the row.
             String selectRowSQL = this.createSelectRowSQL();
@@ -529,8 +558,8 @@ public class HistoryTableImpl implements HistoryTable {
 
         try {
 
-            // Connect to the database.
-            connection = connect(this.tableDataSource);
+            // Connect to the source database.
+            connection = connect(this.sourceDataSource);
 
             // Get the rows.
             String selectRowsSQL = this.createSelectRowsSQL();
@@ -577,7 +606,7 @@ public class HistoryTableImpl implements HistoryTable {
      * @throws  HistoryTableException  if unable to insert a row in the history table.
      */
     @Override
-    public void insert(Action action, String actionBy, Date actionTime) throws HistoryTableException {
+    public void insert(final Action action, final String actionBy, final Date actionTime) throws HistoryTableException {
 
         Connection connection = null;
         PreparedStatement preparedStatement = null;
@@ -587,8 +616,8 @@ public class HistoryTableImpl implements HistoryTable {
             // Get the row from the source table.
             Map<String,Object> row = this.getRow(this.getId());
 
-            // Connect to the database.
-            connection = connect(this.historyTableDataSource);
+            // Connect to the target database.
+            connection = connect(this.targetDataSource);
 
             // Initialize the insert statement.
             int parameterIndex = 1;
@@ -620,6 +649,34 @@ public class HistoryTableImpl implements HistoryTable {
     }
 
     /**
+     * Create a new instance of the history table class.
+     *
+     * @param  entity  the entity.
+     *
+     * @return  a new instance of the history table class.
+     * 
+     * @throws  IllegalArgumentException  if the entity is invalid.
+     */
+    protected static HistoryTable newInstance(final Object entity) throws IllegalArgumentException {
+        return new HistoryTableImpl(entity, null, null);
+    }
+    
+    /**
+     * Create a new instance of the history table class.
+     *
+     * @param  entity            the entity.
+     * @param  sourceDataSource  the source data source.
+     * @param  targetDataSource  the target data source.
+     *
+     * @return  a new instance of the history table class.
+     * 
+     * @throws  IllegalArgumentException  if the entity is invalid.
+     */
+    protected static HistoryTable newInstance(final Object entity, final DataSource sourceDataSource, final DataSource targetDataSource) throws IllegalArgumentException {
+        return new HistoryTableImpl(entity, sourceDataSource, targetDataSource);
+    }
+    
+    /**
      * Populate the history table.
      *
      * @param  actionBy    the action by.
@@ -628,15 +685,15 @@ public class HistoryTableImpl implements HistoryTable {
      * @throws  HistoryTableException  if unable to populate the history table.
      */
     @Override
-    public void populate(String actionBy, Date actionTime) throws HistoryTableException {
+    public void populate(final String actionBy, final Date actionTime) throws HistoryTableException {
 
         Connection connection = null;
         PreparedStatement preparedStatement = null;
 
         try {
 
-            // Connect to the database.
-            connection = connect(this.historyTableDataSource);
+            // Connect to the target database.
+            connection = connect(this.targetDataSource);
 
             // Initialize the insert statement batch.
             String insertRowSQL = this.createInsertRowSQL();
@@ -673,16 +730,5 @@ public class HistoryTableImpl implements HistoryTable {
             // Disconnect from the database.
             disconnect(connection, preparedStatement, null);
         }
-    }
-
-    /**
-     * Set the entity.
-     *
-     * @param  entity  the entity.
-     *
-     * @throws  IllegalArgumentException  if the entity is invalid.
-     */
-    protected static HistoryTable newInstance(Object entity) throws IllegalArgumentException {
-        return new HistoryTableImpl(entity);
     }
 }
